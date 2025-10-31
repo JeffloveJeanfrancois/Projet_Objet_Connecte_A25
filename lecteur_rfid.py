@@ -1,4 +1,3 @@
-# --- Importation des modules nécessaires ---
 from pirc522 import RFID
 import RPi.GPIO as GPIO
 import time
@@ -14,7 +13,7 @@ class LecteurRFID:
                  nom_fichier="journal_rfid.csv",
                  led_rouge=38,
                  led_verte=40):
-        # --- Configuration de base ---
+      
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(broche_buzzer, GPIO.OUT)
         GPIO.setup(led_rouge, GPIO.OUT)
@@ -27,7 +26,7 @@ class LecteurRFID:
         self.delai_lecture = delai_lecture
         self.nom_fichier = nom_fichier
 
-        # Mémorise la dernière carte lue pour éviter les doublons
+        # Mémorise la dernière carte lue 
         self.derniere_carte = None
         self.dernier_temps = 0
 
@@ -39,7 +38,7 @@ class LecteurRFID:
 
         print("Lecteur RFID prêt. Approchez une carte !")
 
-    # --- Fonction pour faire biper le buzzer ---
+    # Fonction pour faire biper le buzzer ---
     def bip(self, duree=0.3):
         GPIO.output(self.buzzer, True)
         GPIO.output(self.led_verte, GPIO.HIGH)
@@ -47,7 +46,7 @@ class LecteurRFID:
         time.sleep(duree)
         GPIO.output(self.buzzer, False)
 
-    # --- Fonction pour afficher les infos de la carte ---
+    # Fonction pour afficher les infos de la carte 
     def afficher_carte(self, type_carte, uid):
         #uid_hex = ' '.join(f'{octet:02X}' for octet in uid)
         print("\n####### Nouvelle carte détectée #######")
@@ -55,7 +54,7 @@ class LecteurRFID:
         print(f"UID  : {uid}")
         print("****************************************")
 
-    # --- Fonction pour enregistrer dans le CSV ---
+    # Fonction pour enregistrer dans le CSV 
     def enregistrer(self, type_carte, uid):
         date = time.strftime("%Y-%m-%d %H:%M:%S")
         #uid_hex = ' '.join(f'{octet:02X}' for octet in uid)
@@ -64,7 +63,7 @@ class LecteurRFID:
             writer = csv.writer(f)
             writer.writerow([date, type_carte, uid_str])
 
-    # --- Boucle principale ---
+    # Boucle principale 
     def lancer(self):
         print(" En attente d’une carte...")
 
