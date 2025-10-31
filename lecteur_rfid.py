@@ -7,15 +7,23 @@ import os
 
 
 class LecteurRFID:
-    """Petit programme pour lire les cartes RFID, faire biper un buzzer et enregistrer les lectures dans un fichier CSV."""
 
-    def __init__(self, broche_buzzer=33, delai_lecture=2, nom_fichier="journal_rfid.csv"):
+    def __init__(self, 
+                 broche_buzzer=33, 
+                 delai_lecture=2, 
+                 nom_fichier="journal_rfid.csv",
+                 led_rouge=38,
+                 led_verte=40):
         # --- Configuration de base ---
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(broche_buzzer, GPIO.OUT)
+        GPIO.setup(led_rouge, GPIO.OUT)
+        GPIO.setup(led_verte, GPIO.OUT)
 
         self.rfid = RFID(pin_irq=None)
         self.buzzer = broche_buzzer
+        self.led_rouge = led_rouge
+        self.led_verte = led_verte
         self.delai_lecture = delai_lecture
         self.nom_fichier = nom_fichier
 
@@ -34,6 +42,8 @@ class LecteurRFID:
     # --- Fonction pour faire biper le buzzer ---
     def bip(self, duree=0.3):
         GPIO.output(self.buzzer, True)
+        GPIO.output(self.led_verte, GPIO.HIGH)
+        GPIO.output(self.led_rouge, GPIO.HIGH)
         time.sleep(duree)
         GPIO.output(self.buzzer, False)
 
@@ -59,6 +69,7 @@ class LecteurRFID:
         print(" En attente d’une carte...")
 
         try:
+
             while True:
                 #self.rfid.wait_for_tag()
                 (erreur, type_carte) = self.rfid.request()
@@ -74,14 +85,17 @@ class LecteurRFID:
 
                 # Vérifie si la même carte a été lue trop récemment
                 if self.derniere_carte == uid and (temps_actuel - self.dernier_temps) < self.delai_lecture:
-                    print("CCette carte a déjà été utilisée il y a moins de 5 secondes, veuillez patienter un peu...")
+                    print("Cette carte a déjà été utilisée il y a moins de 5 secondes, veuillez patienter un peu...")
                     time.sleep(0.5)
                     continue
 
                 # Affichage + bip + enregistrement
                 self.afficher_carte(type_carte, uid)
                 self.bip()
+                GPIO.output(self.led_verte, GPIO.LOW)
+                GPIO.output(self.led_rouge, GPIO.LOW)
                 self.enregistrer(type_carte, uid)
+
 
                 # Mémorisation de la dernière carte
                 self.derniere_carte = uid
