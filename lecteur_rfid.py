@@ -1,8 +1,10 @@
 from pirc522 import RFID
 import RPi.GPIO as GPIO
+import paho.mqtt.client as mqtt
 import time
 import csv
 import os
+import json
 
 
 class LecteurRFID:
@@ -10,9 +12,13 @@ class LecteurRFID:
     def __init__(self, 
                  broche_buzzer=33, 
                  delai_lecture=2, 
-                 nom_fichier="journal_rfid.csv",
-                 led_rouge=38,
-                 led_verte=40):
+                 nom_fichier = "journal_rfid.csv",
+                 led_rouge = 38,
+                 led_verte = 40,
+                 broker = "192.168.40.122",
+                 port = 1883,
+                 sujet_log = "LecteurRFID/log"
+              ):
       
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(broche_buzzer, GPIO.OUT)
@@ -30,6 +36,13 @@ class LecteurRFID:
         self.derniere_carte = None
         self.dernier_temps = 0
 
+        self.broker = broker
+        self.port = 1883
+        self.sujet_log = sujet_log
+
+        self.client = mqtt.Client()
+        self.client.connect(self.broker, self.port, 60)
+
         # Création du fichier CSV avec en-tête s’il n’existe pas encore
         if not os.path.exists(nom_fichier):
             with open(nom_fichier, 'w', newline='') as f:
@@ -41,10 +54,15 @@ class LecteurRFID:
     # Fonction pour faire biper le buzzer ---
     def bip(self, duree=0.3):
         GPIO.output(self.buzzer, True)
+        time.sleep(duree)
+        GPIO.output(self.buzzer, False)
+
+    def allumer_led(self, duree=0.3):
         GPIO.output(self.led_verte, GPIO.HIGH)
         GPIO.output(self.led_rouge, GPIO.HIGH)
         time.sleep(duree)
-        GPIO.output(self.buzzer, False)
+        GPIO.output(self.led_verte, GPIO.LOW)
+        GPIO.output(self.led_rouge, GPIO.LOW)
 
     # Fonction pour afficher les infos de la carte 
     def afficher_carte(self, type_carte, uid):
@@ -62,6 +80,18 @@ class LecteurRFID:
         with open(self.nom_fichier, 'a', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([date, type_carte, uid_str])
+
+    def publier_info_carte(self, date, type_carte, uid):
+        info_carte = json.dumps({
+            "date_heure": date,
+            "type_carte": type_carte,
+            "uid": uid
+        })
+        sujet_carte = f"{self.sujet_log}/{int(time.time())}"
+        self.client.publish(sujet_carte, info_carte, qos=1, retain=False)
+        self.client.loop()
+        print(f"info carte envoyé sur {self.sujet_log} : {info_carte}")
+       
 
     # Boucle principale 
     def lancer(self):
@@ -89,10 +119,11 @@ class LecteurRFID:
                     continue
 
                 # Affichage + bip + enregistrement
+                date = time.strftime("%Y-%m-%d %H:%M:%S")
                 self.afficher_carte(type_carte, uid)
                 self.bip()
-                GPIO.output(self.led_verte, GPIO.LOW)
-                GPIO.output(self.led_rouge, GPIO.LOW)
+                self.allumer_led()
+                self.publier_info_carte(date, type_carte, uid)
                 self.enregistrer(type_carte, uid)
 
 
@@ -103,8 +134,12 @@ class LecteurRFID:
         except KeyboardInterrupt:
             print("\n Arrêt du programme par l’utilisateur.")
         finally:
-            GPIO.cleanup()
+            try:
+                GPIO.cleanup()
+            except RuntimeWarning:
+                pass
             self.rfid.cleanup()
             print(" Nettoyage terminé.")
+
 
 
