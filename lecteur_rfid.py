@@ -57,7 +57,7 @@ class LecteurRFID:
         time.sleep(duree)
         GPIO.output(self.buzzer, False)
 
-    def allumer_led(self, duree=0.3):
+    def gestion_led(self, duree=0.3):
         GPIO.output(self.led_verte, GPIO.HIGH)
         GPIO.output(self.led_rouge, GPIO.HIGH)
         time.sleep(duree)
@@ -122,7 +122,7 @@ class LecteurRFID:
                 date = time.strftime("%Y-%m-%d %H:%M:%S")
                 self.afficher_carte(type_carte, uid)
                 self.bip()
-                self.allumer_led()
+                self.gestion_led()
                 self.publier_info_carte(date, type_carte, uid)
                 self.enregistrer(type_carte, uid)
 
