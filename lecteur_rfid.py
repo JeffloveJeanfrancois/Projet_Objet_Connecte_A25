@@ -5,6 +5,8 @@ import time
 import csv
 import os
 import json
+import sys
+from typing import Dict
 
 
 class LecteurRFID:
@@ -18,7 +20,8 @@ class LecteurRFID:
                  fichier_autorise="cartes_autorisees.csv",
                  broker = "192.168.40.122",
                  port = 1883,
-                 sujet_log = "LecteurRFID/log"
+                 sujet_log = "LecteurRFID/log",
+                 fichier_cartes = "cartes_autorisees.json"
               ):
       
         GPIO.setmode(GPIO.BOARD)
@@ -32,7 +35,9 @@ class LecteurRFID:
         self.led_verte = led_verte
         self.delai_lecture = delai_lecture
         self.nom_fichier = nom_fichier
-        self.fichier_autorise = fichier_autorise
+        #self.fichier_autorise = fichier_autorise
+        self.fichier_cartes = fichier_cartes
+        self.cartes_autorisees = self._charger_cartes_autorisees()
 
         # Mémorise la dernière carte lue 
         self.derniere_carte = None
@@ -49,15 +54,15 @@ class LecteurRFID:
         self.client = mqtt.Client()
         self.client.connect(self.broker, self.port, 60)
 
-        # Création du fichier CSV avec en-tête s’il n’existe pas encore
+        # Création du fichier CSV avec en-tête s'il n'existe pas encore
         if not os.path.exists(nom_fichier):
-            with open(nom_fichier, 'w', newline='') as f:
+            with open(nom_fichier, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
-                writer.writerow(["Date/Heure", "Type de carte", "UID"])
+                writer.writerow(["Date/Heure", "Type de carte", "UID", "Nom", "Statut"])
 
         print("Lecteur RFID prêt. Approchez une carte !")
 
-    def charger_cartes_autorisees(self):
+    def charger_cartes_autoriseesZ(self):
        #Charge le fichier CSV des cartes autorisées dans un dictionnaire
         if not os.path.exists(self.fichier_autorise): #si existe pas
             # Création d'un fichier exemple si vide
@@ -79,7 +84,7 @@ class LecteurRFID:
             print(f"Erreur chargement cartes: {e}")
 
     # --- ZAKARIA (b) : Sauvegarde après utilisation ---
-    def sauvegarder_cartes_autorisees(self):
+    def sauvegarder_cartes_autoriseesZ(self):
         #Réécrit le fichier CSV avec les nouveaux crédits
         try:
             with open(self.fichier_autorise, 'w', newline='') as f:
@@ -89,8 +94,34 @@ class LecteurRFID:
                     writer.writerow([uid, credit])
         except Exception as e:
             print(f"Erreur sauvegarde: {e}")
+    def _charger_cartes_autorisees(self) -> Dict:
+        if not os.path.exists(self.fichier_cartes):
+            print(f"Le fichier {self.fichier_cartes} n'existe pas")
+            sys.exit(1)
+        
+        try:
+            with open(self.fichier_cartes, 'r') as fichier:
+                data = json.load(fichier)
+                resultat = {}
+                for carte in data.get('cartes', []):
+                    uid = carte.get('uid')
+                    if uid:
+                        resultat[carte['uid']] = {
+                            'nom': carte.get('nom', 'Inconnu'),
+                            'actif': carte.get('actif', False)
+                        }
+                return resultat
+        except Exception as exception:
+            print(f"Erreur lors du chargement des cartes: {exception}")
+            return {}
 
-    def allumer_led(self, duree=0.3):
+    # Fonction pour faire biper le buzzer ---
+    def bip(self, duree=0.3):
+        GPIO.output(self.buzzer, True)
+        time.sleep(duree)
+        GPIO.output(self.buzzer, False)
+
+    def gestion_led(self, duree=0.3):
         GPIO.output(self.led_verte, GPIO.HIGH)
         GPIO.output(self.led_rouge, GPIO.HIGH)
         time.sleep(duree)
@@ -105,20 +136,31 @@ class LecteurRFID:
         print(f"UID  : {uid}")
         print("****************************************")
 
+    def _verifier_carte(self, uid):
+        if uid in self.cartes_autorisees:
+            carte_info = self.cartes_autorisees[uid]
+            if carte_info['actif']:
+                return True, carte_info['nom'], "Accepté"
+            else:
+                return False, carte_info['nom'], "Carte désactivée"
+        else:
+            return False, "Non renseigné", "Refusé - Carte non autorisée"
+
     # Fonction pour enregistrer dans le CSV 
-    def enregistrer(self, type_carte, uid):
+    def enregistrer(self, type_carte, uid, nom, statut):
         date = time.strftime("%Y-%m-%d %H:%M:%S")
-        #uid_hex = ' '.join(f'{octet:02X}' for octet in uid)
         uid_str = "-".join(str(octet) for octet in uid)
-        with open(self.nom_fichier, 'a', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow([date, type_carte, uid_str])
+        
+        with open(self.nom_fichier, 'a', newline='', encoding='utf-8') as fichier_csv:
+            writer = csv.writer(fichier_csv)
+            writer.writerow([date, type_carte, uid_str, nom, statut])
 
     def publier_info_carte(self, date, type_carte, uid):
+        uid_str = "-".join(str(octet) for octet in uid)
         info_carte = json.dumps({
             "date_heure": date,
             "type_carte": type_carte,
-            "uid": uid
+            "uid": uid_str
         })
         sujet_carte = f"{self.sujet_log}/{int(time.time())}"
         self.client.publish(sujet_carte, info_carte, qos=1, retain=False)
@@ -151,13 +193,28 @@ class LecteurRFID:
                     time.sleep(0.5)
                     continue
 
+                # Vérification de la carte
+                uid_string = "-".join(str(octet) for octet in uid)
+                est_autorisee, nom, statut = self._verifier_carte(uid_string)
+                
                 # Affichage + bip + enregistrement
                 date = time.strftime("%Y-%m-%d %H:%M:%S")
                 self.afficher_carte(type_carte, uid)
-                self.bip()
-                self.allumer_led()
+                print(f"Nom: {nom}")
+                print(f"Statut: {statut}")
+                
+                # Feedback visuel et sonore selon le statut
+                if est_autorisee:
+                    GPIO.output(self.led_verte, GPIO.HIGH)
+                    self.bip(0.2)  # Bip court pour accès autorisé
+                    GPIO.output(self.led_verte, GPIO.LOW)
+                else:
+                    GPIO.output(self.led_rouge, GPIO.HIGH)
+                    self.bip(0.8)  # Bip long pour accès refusé
+                    GPIO.output(self.led_rouge, GPIO.LOW)
+                
                 self.publier_info_carte(date, type_carte, uid)
-                self.enregistrer(type_carte, uid)
+                self.enregistrer(type_carte, uid, nom, statut)
 
 
                 # Mémorisation de la dernière carte
