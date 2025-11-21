@@ -15,6 +15,7 @@ class LecteurRFID:
                  nom_fichier = "journal_rfid.csv",
                  led_rouge = 38,
                  led_verte = 40,
+                 fichier_autorise="cartes_autorisees.csv",
                  broker = "192.168.40.122",
                  port = 1883,
                  sujet_log = "LecteurRFID/log"
@@ -31,10 +32,15 @@ class LecteurRFID:
         self.led_verte = led_verte
         self.delai_lecture = delai_lecture
         self.nom_fichier = nom_fichier
+        self.fichier_autorise = fichier_autorise
 
         # Mémorise la dernière carte lue 
         self.derniere_carte = None
         self.dernier_temps = 0
+
+        # Gestion des cartes autorisées (Dictionnaire: UID_STR -> Credits)
+        self.cartes_db = {} 
+        self.charger_cartes_autorisees()
 
         self.broker = broker
         self.port = 1883
@@ -51,11 +57,38 @@ class LecteurRFID:
 
         print("Lecteur RFID prêt. Approchez une carte !")
 
-    # Fonction pour faire biper le buzzer ---
-    def bip(self, duree=0.3):
-        GPIO.output(self.buzzer, True)
-        time.sleep(duree)
-        GPIO.output(self.buzzer, False)
+    def charger_cartes_autorisees(self):
+       #Charge le fichier CSV des cartes autorisées dans un dictionnaire
+        if not os.path.exists(self.fichier_autorise): #si existe pas
+            # Création d'un fichier exemple si vide
+            with open(self.fichier_autorise, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(["UID", "Credits"])
+                writer.writerow(["123-45-67-89", "10"])# Exemple de carte
+            print(f"Fichier {self.fichier_autorise} créé.")
+        
+        try:
+            with open(self.fichier_autorise, mode='r') as f:
+                reader = csv.DictReader(f)
+                self.cartes_db = {}
+                for row in reader:
+                    # On stocke : Clé = UID, Valeur = int(Credits)
+                    self.cartes_db[row["UID"]] = int(row["Credits"])
+            print(" données des cartes chargée :", self.cartes_db)
+        except Exception as e:
+            print(f"Erreur chargement cartes: {e}")
+
+    # --- ZAKARIA (b) : Sauvegarde après utilisation ---
+    def sauvegarder_cartes_autorisees(self):
+        #Réécrit le fichier CSV avec les nouveaux crédits
+        try:
+            with open(self.fichier_autorise, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(["UID", "Credits"])
+                for uid, credit in self.cartes_db.items():
+                    writer.writerow([uid, credit])
+        except Exception as e:
+            print(f"Erreur sauvegarde: {e}")
 
     def allumer_led(self, duree=0.3):
         GPIO.output(self.led_verte, GPIO.HIGH)
