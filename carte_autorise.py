@@ -19,32 +19,6 @@ class GestionAcces:
 
     def verifier_carte(self, uid):
         try:
-            with open(self.nom_fichier, 'r') as f:
-                reader = csv.DictReader(f)
-
-                for ligne in reader:
-                    if ligne["UID"] == uid:
-                        autorise = ligne["Autorise"].strip().lower() == "true"
-                        nom = ligne["Nom"]
-                        # On récupère les crédits et l'ID (avec une valeur par défaut si vide)
-                        credits = ligne.get("Credits", "0")
-                        id_carte = ligne.get("Id", "")
-
-                        if autorise:
-                            return True, nom, "Accepté", credits, id_carte
-                        else:
-                            return False, nom, "Refusé - non autorisé", credits, id_carte
-
-            # Si on sort de la boucle → carte non trouvée
-            return False, "Non renseigné", "Refusé - Carte inconnue", "0", ""
-
-        except Exception as e:
-            print(f"[Erreur CSV] {e}")
-            return False, "Erreur", "Erreur lecture CSV", "0", ""
-        
-
-    def verifier_carte(self, uid):
-        try:
             with open(self.nom_fichier, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
 

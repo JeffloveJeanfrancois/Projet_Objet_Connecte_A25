@@ -10,7 +10,6 @@ from typing import Dict
 from carte_autorise import GestionAcces
 
 from card_manager import CardService, ReadError
-
 from card_reader import CardReader
 
 
@@ -44,8 +43,13 @@ class LecteurRFID:
         self.fichier_cartes = fichier_cartes
         self.fichier_cartes_csv = fichier_cartes_csv
         self.cartes_autorisees = self._charger_cartes_autorisees()
+        
+        # Initialisation gestion CSV
         self.gestion_acces = GestionAcces(self.fichier_cartes_csv)
+        
+        # Initialisation Lecteur Mifare (pour les blocs)
         self.mifare = CardReader()
+        
         self.questions_admin = self._charger_questions_admin("pass.json")
 
 
@@ -105,21 +109,10 @@ class LecteurRFID:
 
     # Fonction pour afficher les infos de la carte 
     def afficher_carte(self, type_carte, uid):
-        #uid_hex = ' '.join(f'{octet:02X}' for octet in uid)
         print("\n####### Nouvelle carte détectée #######")
         print(f"Type : {type_carte}")
         print(f"UID  : {uid}")
         print("****************************************")
-
-    def _verifier_carte(self, uid):
-        if uid in self.cartes_autorisees:
-            carte_info = self.cartes_autorisees[uid]
-            if carte_info['actif']:
-                return True, carte_info['nom'], "Accepté"
-            else:
-                return False, carte_info['nom'], "Carte désactivée"
-        else:
-            return False, "Non renseigné", "Refusé - Carte non autorisée"
         
     # Fonction pour enregistrer dans le CSV 
     def enregistrer(self, type_carte, uid, nom, statut):
@@ -227,7 +220,6 @@ class LecteurRFID:
                     continue
 
                 contenu = self.mifare.lire_bloc(uid, bloc)
-                #print(f"Contenu du bloc {bloc} : {contenu}")
                 if contenu is None:
                     print(f"[ERREUR] Impossible de lire le bloc {bloc}. Vérifie la clé ou le bloc.")
                 else:
@@ -294,9 +286,25 @@ class LecteurRFID:
             print(f"[ERREUR] Chargement questions admin: {e}")
             return {}
 
+    # --- Petite fonction aide pour sortir la logique admin de la boucle principale ---
+    def _gerer_admin(self, uid_string, uid_carte):
+        question_data = self.questions_admin.get(uid_string)
+        if question_data:
+            print(f"[SECURITE] Question pour admin : {question_data['question']}")
+            tentatives = 3
+            while tentatives > 0:
+                reponse = input("Votre réponse : ").strip()
+                if reponse.lower() == question_data['reponse'].strip().lower():
+                    print("[INFO] Accès admin autorisé.")
+                    self.interface_admin(uid_carte)
+                    break
+                else:
+                    tentatives -= 1
+                    print(f"Incorrect. Reste {tentatives} essais.")
+        else:
+            self.interface_admin(uid_carte)
 
-    # Boucle principale 
-    # Boucle principale 
+    # --- Boucle principale ---
     def lancer(self):
         print(" En attente d’une carte...")
 
@@ -370,12 +378,7 @@ class LecteurRFID:
                 
                 # 6. ACTION (LED + BIP)
                 if est_autorisee:
-                    self.gestion_led(0.3) # Petit flash vert/rouge ou juste vert selon ta fonction
-                    # Tu peux remettre ton code spécifique LED ici si tu préfères
-                    GPIO.output(self.led_verte, GPIO.HIGH)
-                    self.bip(0.2)  
-                    GPIO.output(self.led_verte, GPIO.LOW)
-                    
+                    self.gestion_led(0.3) 
                     # Gestion Admin
                     if nom.lower() == "admin":
                         self._gerer_admin(uid_str, uid_carte)
@@ -401,24 +404,3 @@ class LecteurRFID:
                 pass
             self.rfid.cleanup()
             print(" Nettoyage terminé.")
-
-    # Petite fonction aide pour sortir la logique admin de la boucle principale
-    def _gerer_admin(self, uid_string, uid_carte):
-        question_data = self.questions_admin.get(uid_string)
-        if question_data:
-            print(f"[SECURITE] Question pour admin : {question_data['question']}")
-            tentatives = 3
-            while tentatives > 0:
-                reponse = input("Votre réponse : ").strip()
-                if reponse.lower() == question_data['reponse'].strip().lower():
-                    print("[INFO] Accès admin autorisé.")
-                    self.interface_admin(uid_carte)
-                    break
-                else:
-                    tentatives -= 1
-                    print(f"Incorrect. Reste {tentatives} essais.")
-        else:
-            self.interface_admin(uid_carte)
-
-
-

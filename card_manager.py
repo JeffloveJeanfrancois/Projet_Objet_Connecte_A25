@@ -46,26 +46,30 @@ class CardService:
 
     # ---- ID ----
     def read_card_id(self, uid):
-        data = self.reader.read_block(uid, self.BLOCK_ID)
+        # CORRECTION ICI: on utilise lire_bloc (français) au lieu de read_block
+        data = self.reader.lire_bloc(uid, self.BLOCK_ID)
         if not data:
             raise ReadError(uid)
         return block_to_str(data)
 
     def write_card_id(self, uid, card_id: str):
-        success = self.reader.write_block(uid, self.BLOCK_ID, str_to_block(card_id))
+        # CORRECTION ICI: on utilise ecrire_bloc (français)
+        success = self.reader.ecrire_bloc(uid, self.BLOCK_ID, str_to_block(card_id))
         if not success:
             raise WriteError(uid)
         return success
 
     # ---- COUNTER ----
     def read_counter(self, uid):
-        data = self.reader.read_block(uid, self.BLOCK_COUNTER)
+        # CORRECTION ICI: on utilise lire_bloc (français)
+        data = self.reader.lire_bloc(uid, self.BLOCK_COUNTER)
         if not data:
             raise ReadError(uid, "Impossible de lire le compteur")
         return block_to_int(data)
 
     def write_counter(self, uid, value: int):
-        success = self.reader.write_block(uid, self.BLOCK_COUNTER, int_to_block(value))
+        # CORRECTION ICI: on utilise ecrire_bloc (français)
+        success = self.reader.ecrire_bloc(uid, self.BLOCK_COUNTER, int_to_block(value))
         if not success:
             raise WriteError(uid, "Impossible de modifier le compteur")
         return success
