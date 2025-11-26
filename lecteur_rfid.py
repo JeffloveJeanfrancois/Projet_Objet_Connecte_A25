@@ -7,7 +7,7 @@ import os
 import json
 import sys
 from typing import Dict
-from configuration_carte import CarteConfiguration
+from card_reader import CardReader
 
 
 class LecteurRFID:
@@ -38,7 +38,7 @@ class LecteurRFID:
         self.nom_fichier = nom_fichier
         self.fichier_cartes = fichier_cartes
         self.cartes_autorisees = self._charger_cartes_autorisees()
-        self.mifare = CarteConfiguration()
+        self.mifare = CardReader()
         self.questions_admin = self._charger_questions_admin("pass.json")
 
 
