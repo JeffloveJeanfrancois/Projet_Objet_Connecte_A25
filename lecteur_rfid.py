@@ -40,6 +40,8 @@ class LecteurRFID:
 
         self.delai_lecture = delai_lecture
         self.nom_fichier = nom_fichier
+        self.fichier_cartes = fichier_cartes
+        self.cartes_autorisees = self._charger_cartes_autorisees()
 
         self.derniere_carte = None
         self.dernier_temps = 0
@@ -54,7 +56,7 @@ class LecteurRFID:
 
         # Création du fichier CSV si inexistant
         if not os.path.exists(nom_fichier):
-            with open(nom_fichier, 'w', newline='') as f:
+            with open(nom_fichier, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
                 writer.writerow(["Date/Heure", "UID", "Accès"])
 
