@@ -7,6 +7,8 @@ import os
 import json
 import sys
 from typing import Dict
+from carte_autorise import GestionAcces
+
 
 
 class LecteurRFID:
@@ -20,7 +22,8 @@ class LecteurRFID:
                  broker = "192.168.40.122",
                  port = 1883,
                  sujet_log = "LecteurRFID/log",
-                 fichier_cartes = "cartes_autorisees.json"
+                 fichier_cartes = "cartes_autorisees.json",
+                 fichier_cartes_csv = "cartes_autorisees.csv"
               ):
       
         GPIO.setmode(GPIO.BOARD)
@@ -35,7 +38,10 @@ class LecteurRFID:
         self.delai_lecture = delai_lecture
         self.nom_fichier = nom_fichier
         self.fichier_cartes = fichier_cartes
+        self.fichier_cartes_csv = fichier_cartes_csv
         self.cartes_autorisees = self._charger_cartes_autorisees()
+        self.gestion_acces = GestionAcces(self.fichier_cartes_csv)
+
 
         # Mémorise la dernière carte lue 
         self.derniere_carte = None
@@ -48,11 +54,12 @@ class LecteurRFID:
         self.client = mqtt.Client()
         self.client.connect(self.broker, self.port, 60)
 
-        # Création du fichier CSV avec en-tête s'il n'existe pas encore
+        # Création du fichier CSV s'il n'existe pas encore
         if not os.path.exists(nom_fichier):
             with open(nom_fichier, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
                 writer.writerow(["Date/Heure", "Type de carte", "UID", "Nom", "Statut"])
+        self.gestion_acces.creer_fichier_si_absent()
 
         print("Lecteur RFID prêt. Approchez une carte !")
 
@@ -107,7 +114,7 @@ class LecteurRFID:
                 return False, carte_info['nom'], "Carte désactivée"
         else:
             return False, "Non renseigné", "Refusé - Carte non autorisée"
-
+        
     # Fonction pour enregistrer dans le CSV 
     def enregistrer(self, type_carte, uid, nom, statut):
         date = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -129,7 +136,6 @@ class LecteurRFID:
         self.client.loop()
         print(f"info carte envoyé sur {self.sujet_log} : {info_carte}")
        
-
     # Boucle principale 
     def lancer(self):
         print(" En attente d’une carte...")
@@ -155,9 +161,13 @@ class LecteurRFID:
                     time.sleep(0.5)
                     continue
 
-                # Vérification de la carte
+                # Vérification de la carte avec json
                 uid_string = "-".join(str(octet) for octet in uid)
-                est_autorisee, nom, statut = self._verifier_carte(uid_string)
+                #est_autorisee, nom, statut = self._verifier_carte(uid_string) 
+
+                #verification avec fichier csv 
+                est_autorisee, nom, statut = self.gestion_acces.verifier_carte(uid_string)
+
                 
                 # Affichage + bip + enregistrement
                 date = time.strftime("%Y-%m-%d %H:%M:%S")
