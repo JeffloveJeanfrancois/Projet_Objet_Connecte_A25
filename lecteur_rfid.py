@@ -7,7 +7,7 @@ from pirc522 import RFID
 import paho.mqtt.client as mqtt
 
 from gestion_acces import GestionAcces           # LEDs + buzzer + messages
-from identification import identifier_carte      # vérifie si la carte est autorisée
+from verification import identifier_carte      # vérifie si la carte est autorisée
 
 
 class LecteurRFID:
