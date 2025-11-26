@@ -37,8 +37,8 @@ class InsufficientCounter(CardError):
 
 
 class CardService:
-    BLOCK_ID = 1
-    BLOCK_COUNTER = 2
+    BLOCK_ID = 4
+    BLOCK_COUNTER = 5
     MAX_COUNTER = 999
 
     def __init__(self, reader):
