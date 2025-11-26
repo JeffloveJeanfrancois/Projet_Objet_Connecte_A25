@@ -78,4 +78,3 @@ class CarteConfiguration:
             print(f"[ERREUR] Écriture échouée bloc {numero_bloc}")
         return succes
  
-
