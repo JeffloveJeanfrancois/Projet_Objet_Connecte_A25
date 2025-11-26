@@ -1,12 +1,13 @@
-from pirc522 import RFID
-import RPi.GPIO as GPIO
-import paho.mqtt.client as mqtt
 import time
 import csv
 import os
 import json
-import sys
-from typing import Dict
+import RPi.GPIO as GPIO
+from pirc522 import RFID
+import paho.mqtt.client as mqtt
+
+from gestion_acces import GestionAcces           # LEDs + buzzer + messages
+from verification import identifier_carte      # vérifie si la carte est autorisée
 
 
 class LecteurRFID:
@@ -24,25 +25,30 @@ class LecteurRFID:
               ):
       
         GPIO.setmode(GPIO.BOARD)
-        GPIO.setup(broche_buzzer, GPIO.OUT)
-        GPIO.setup(led_rouge, GPIO.OUT)
-        GPIO.setup(led_verte, GPIO.OUT)
 
         self.rfid = RFID(pin_irq=None)
         self.buzzer = broche_buzzer
         self.led_rouge = led_rouge
         self.led_verte = led_verte
+
+        # Gestion accès (LED + buzzer + console)
+        self.acces = GestionAcces(
+            led_verte=self.led_verte,
+            led_rouge=self.led_rouge,
+            buzzer=self.buzzer
+        )
+
         self.delai_lecture = delai_lecture
         self.nom_fichier = nom_fichier
         self.fichier_cartes = fichier_cartes
         self.cartes_autorisees = self._charger_cartes_autorisees()
 
-        # Mémorise la dernière carte lue 
         self.derniere_carte = None
         self.dernier_temps = 0
 
+        # MQTT
         self.broker = broker
-        self.port = 1883
+        self.port = port
         self.sujet_log = sujet_log
 
         self.client = mqtt.Client()
@@ -124,23 +130,25 @@ class LecteurRFID:
             "type_carte": type_carte,
             "uid": uid_str
         })
-        sujet_carte = f"{self.sujet_log}/{int(time.time())}"
-        self.client.publish(sujet_carte, info_carte, qos=1, retain=False)
-        self.client.loop()
-        print(f"info carte envoyé sur {self.sujet_log} : {info_carte}")
-       
 
-    # Boucle principale 
+        sujet = f"{self.sujet_log}/{int(time.time())}"
+        self.client.publish(sujet, info_carte, qos=1, retain=False)
+        self.client.loop()
+
+        print(f"Info carte envoyée sur MQTT : {info_carte}")
+
+    # ---------------------------------------------------
+    # Boucle principale
+    # ---------------------------------------------------
     def lancer(self):
-        print(" En attente d’une carte...")
+        print("En attente d’une carte...")
 
         try:
-
             while True:
-                #self.rfid.wait_for_tag()
+
                 (erreur, type_carte) = self.rfid.request()
                 if erreur:
-                    time.sleep(0.1)
+                    time.sleep(0.05)
                     continue
 
                 (erreur, uid) = self.rfid.anticoll()
@@ -149,10 +157,9 @@ class LecteurRFID:
 
                 temps_actuel = time.time()
 
-                # Vérifie si la même carte a été lue trop récemment
+                # Anti-spam : carte lue trop vite
                 if self.derniere_carte == uid and (temps_actuel - self.dernier_temps) < self.delai_lecture:
-                    print("Cette carte a déjà été utilisée il y a moins de 5 secondes, veuillez patienter un peu...")
-                    time.sleep(0.5)
+                    print("Carte déjà utilisée récemment, patientez...")
                     continue
 
                 # Vérification de la carte
@@ -178,20 +185,28 @@ class LecteurRFID:
                 self.publier_info_carte(date, type_carte, uid)
                 self.enregistrer(type_carte, uid, nom, statut)
 
+                # Vérification d’accès
+                carte_ok = identifier_carte(uid)
 
-                # Mémorisation de la dernière carte
+                if carte_ok:
+                    self.acces.carte_acceptee()
+                    acces = "accepte"
+                else:
+                    self.acces.carte_refusee()
+                    acces = "refuse"
+
+                # Enregistrements
+                self.enregistrer(uid, acces)
+                self.publier_info_carte(uid, acces)
+
+                # Mémorisation pour éviter les doublons
                 self.derniere_carte = uid
                 self.dernier_temps = temps_actuel
 
         except KeyboardInterrupt:
-            print("\n Arrêt du programme par l’utilisateur.")
+            print("\nArrêt du programme.")
+
         finally:
-            try:
-                GPIO.cleanup()
-            except RuntimeWarning:
-                pass
+            GPIO.cleanup()
             self.rfid.cleanup()
-            print(" Nettoyage terminé.")
-
-
-
+            print("GPIO nettoyé – Fin du programme.")
