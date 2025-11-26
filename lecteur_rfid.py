@@ -5,6 +5,10 @@ import json
 import RPi.GPIO as GPIO
 from pirc522 import RFID
 import paho.mqtt.client as mqtt
+from typing import Dict
+#from lecteur_rfid import LecteurRFID
+
+
 
 from gestion_acces import GestionAcces           # LEDs + buzzer + messages
 from verification import identifier_carte      # vérifie si la carte est autorisée
@@ -18,7 +22,7 @@ class LecteurRFID:
                  nom_fichier = "journal_rfid.csv",
                  led_rouge = 38,
                  led_verte = 40,
-                 broker = "192.168.40.122",
+                 broker = "10.4.1.113",
                  port = 1883,
                  sujet_log = "LecteurRFID/log",
                  fichier_cartes = "cartes_autorisees.json"
