@@ -8,6 +8,7 @@ import paho.mqtt.client as mqtt
 
 from gestion_acces import GestionAcces           # LEDs + buzzer + messages
 from verification import identifier_carte      # vérifie si la carte est autorisée
+from affichage_qapass import AffichageQapass
 
 
 class LecteurRFID:
@@ -18,7 +19,7 @@ class LecteurRFID:
                  nom_fichier="journal_rfid.csv",
                  led_rouge=38,
                  led_verte=40,
-                 broker="10.4.1.113",
+                 broker="10.4.1.191",
                  port=1883,
                  sujet_log="LecteurRFID/log",
                  fichier_cartes="cartes_autorisees.json"
@@ -37,11 +38,14 @@ class LecteurRFID:
         GPIO.setup(self.led_rouge, GPIO.OUT)  # <-- AJOUTEZ CECI
         GPIO.setup(self.buzzer, GPIO.OUT)     # <-- AJOUTEZ CECI
 
+        self.ecran = AffichageQapass()
+
         # Gestion accès (LED + buzzer + console)
         self.acces = GestionAcces(
             led_verte=self.led_verte,
             led_rouge=self.led_rouge,
-            buzzer=self.buzzer
+            buzzer=self.buzzer,
+            ecran=self.ecran
         )
 
         self.delai_lecture = delai_lecture
@@ -103,6 +107,8 @@ class LecteurRFID:
     # ---------------------------------------------------
     def lancer(self):
         print("En attente d’une carte...")
+        if self.ecran:
+            self.ecran.accueil()
 
         try:
             while True:
@@ -127,20 +133,33 @@ class LecteurRFID:
                 print("UID :", uid)
 
                 # Vérification d’accès
-                carte_ok = identifier_carte(uid)
+                carte_ok, nom_utilisateur = identifier_carte(uid)
 
                 if carte_ok:
-                    self.acces.carte_acceptee()
+                    self.acces.carte_acceptee(nom=nom_utilisateur)
                     acces = "accepte"
+                    # On affiche un message sur l'écran <--- AJOUT
+                    # On suppose que identifier_carte affiche le nom.
+                    # self.ecran.afficher(
+                    #     ligne1="ACCES ACCEPTE", 
+                    #     ligne2="Bienvenue!", 
+                    #     duree=2
+                    # )
                 else:
                     self.acces.carte_refusee()
                     acces = "refuse"
+                    # On affiche un message d'erreur sur l'écran <--- AJOUT
+                    # self.ecran.afficher(
+                    #     ligne1="ACCES REFUSE", 
+                    #     ligne2="Carte invalide", 
+                    #     duree=2
+                    # )
 
                 # Enregistrements
                 self.enregistrer(uid, acces)
                 self.publier_info_carte(uid, acces)
 
-                # Mémorisation pour éviter les doublons
+                # Mémorisation pour éviter les doublons..............................................................
                 self.derniere_carte = uid
                 self.dernier_temps = temps_actuel
 

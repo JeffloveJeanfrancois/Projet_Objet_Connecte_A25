@@ -5,7 +5,7 @@ def main():
     lecteur = LecteurRFID(
         broche_buzzer=33,   
         delai_lecture=2,
-        broker="10.4.1.113",  
+        broker="10.4.1.191",  
         port=1883,
         sujet_log="LecteurRFID/log",
         fichier_cartes="cartes_autorisees.json"  
