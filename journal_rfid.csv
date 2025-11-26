@@ -1,1 +1,11 @@
-Date/Heure,Type de carte,UID,Nom,Statut
+Date/Heure,UID,Type de carte,Nom,Statut
+2025-01-01 08:12,A1B2C3D4,RFID,Alice,Accepté
+2025-01-01 08:15,FFFF1111,RFID,Bob,Carte désactivée
+2025-01-01 08:20,DEADBEEF,RFID,,Refusé - Carte non autorisée
+2025-01-01 09:02,12345678,RFID,Charles,Accepté
+2025-01-01 09:05,87654321,RFID,,Refusé - Carte non autorisée
+2025-01-01 09:10,A1B2C3D4,RFID,,Accepté
+2025-01-01 10:00,FACEB00C,RFID,,Tentative d'accès suspecte
+2025-01-01 10:05,BEEFCAFE,RFID,Eve,Accepté
+2025-01-01 10:10,BEEFCAFE,RFID,Eve,Accepté
+2025-01-01 11:22,FFFF1111,RFID,Bob,Carte désactivée
