@@ -7,6 +7,7 @@ import os
 import json
 import sys
 from typing import Dict
+from carte_autorise import GestionAcces
 
 
 class LecteurRFID:
@@ -39,6 +40,8 @@ class LecteurRFID:
         self.fichier_cartes = fichier_cartes
         self.cartes_autorisees = self._charger_cartes_autorisees()
 
+        self.mes_acces = GestionAcces("cartes_autorisees.csv")
+
         # Mémorise la dernière carte lue 
         self.derniere_carte = None
         self.dernier_temps = 0
@@ -62,38 +65,6 @@ class LecteurRFID:
 
         print("Lecteur RFID prêt. Approchez une carte !")
 
-    def charger_cartes_autoriseesZ(self):
-       #Charge le fichier CSV des cartes autorisées dans un dictionnaire
-        if not os.path.exists(self.fichier_autorise): #si existe pas
-            # Création d'un fichier exemple si vide
-            with open(self.fichier_autorise, 'w', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow(["UID", "Credits"])
-                writer.writerow(["123-45-67-89", "10"])# Exemple de carte
-            print(f"Fichier {self.fichier_autorise} créé.")
-        
-        try:
-            with open(self.fichier_autorise, mode='r') as f:
-                reader = csv.DictReader(f)
-                self.cartes_db = {}
-                for row in reader:
-                    # On stocke : Clé = UID, Valeur = int(Credits)
-                    self.cartes_db[row["UID"]] = int(row["Credits"])
-            print(" données des cartes chargée :", self.cartes_db)
-        except Exception as e:
-            print(f"Erreur chargement cartes: {e}")
-
-    # --- ZAKARIA (b) : Sauvegarde après utilisation ---
-    def sauvegarder_cartes_autoriseesZ(self):
-        #Réécrit le fichier CSV avec les nouveaux crédits
-        try:
-            with open(self.fichier_autorise, 'w', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow(["UID", "Credits"])
-                for uid, credit in self.cartes_db.items():
-                    writer.writerow([uid, credit])
-        except Exception as e:
-            print(f"Erreur sauvegarde: {e}")
     def _charger_cartes_autorisees(self) -> Dict:
         if not os.path.exists(self.fichier_cartes):
             print(f"Le fichier {self.fichier_cartes} n'existe pas")
@@ -197,29 +168,57 @@ class LecteurRFID:
                 uid_string = "-".join(str(octet) for octet in uid)
                 est_autorisee, nom, statut = self._verifier_carte(uid_string)
                 
-                # Affichage + bip + enregistrement
-                date = time.strftime("%Y-%m-%d %H:%M:%S")
-                self.afficher_carte(type_carte, uid)
-                print(f"Nom: {nom}")
-                print(f"Statut: {statut}")
+                #zak
+                self.derniere_carte = uid_string
+                self.dernier_temps = temps_actuel
                 
-                # Feedback visuel et sonore selon le statut
-                if est_autorisee:
+                est_autorise, credits_restants = self.mes_acces.verifier_et_debiter(uid_string)
+
+                statut = "REFUSE"
+
+                if est_autorise:
+                    print(f"ACCÈS AUTORISÉ ! Crédits restants: {credits_restants}")
+                    statut = "AUTORISE"
                     GPIO.output(self.led_verte, GPIO.HIGH)
-                    self.bip(0.2)  # Bip court pour accès autorisé
+                    self.bip(0.1, 2)
+                    time.sleep(1)
                     GPIO.output(self.led_verte, GPIO.LOW)
                 else:
+                    print(f"ACCÈS REFUSÉ (Crédits insuffisants ou carte inconnue)")
                     GPIO.output(self.led_rouge, GPIO.HIGH)
-                    self.bip(0.8)  # Bip long pour accès refusé
+                    self.bip(0.8, 1)
                     GPIO.output(self.led_rouge, GPIO.LOW)
+
+                # Enregistrement
+                date = time.strftime("%Y-%m-%d %H:%M:%S")
+                self.enregistrer(type_carte, uid_string, statut, credits_restants)
+                self.publier_info_carte(date, uid_string, statut, credits_restants)
+
+
+
+                # Affichage + bip + enregistrement
+                #date = time.strftime("%Y-%m-%d %H:%M:%S")
+                #self.afficher_carte(type_carte, uid)
+                #print(f"Nom: {nom}")
+                #print(f"Statut: {statut}")
                 
-                self.publier_info_carte(date, type_carte, uid)
-                self.enregistrer(type_carte, uid, nom, statut)
+                # Feedback visuel et sonore selon le statut
+                #if est_autorisee:
+                #    GPIO.output(self.led_verte, GPIO.HIGH)
+                #    self.bip(0.2)  # Bip court pour accès autorisé
+                #    GPIO.output(self.led_verte, GPIO.LOW)
+                #else:
+                #    GPIO.output(self.led_rouge, GPIO.HIGH)
+                #    self.bip(0.8)  # Bip long pour accès refusé
+                #    GPIO.output(self.led_rouge, GPIO.LOW)
+                
+                #self.publier_info_carte(date, type_carte, uid)
+                #self.enregistrer(type_carte, uid, nom, statut)
 
 
                 # Mémorisation de la dernière carte
-                self.derniere_carte = uid
-                self.dernier_temps = temps_actuel
+                #self.derniere_carte = uid
+                #self.dernier_temps = temps_actuel
 
         except KeyboardInterrupt:
             print("\n Arrêt du programme par l’utilisateur.")
