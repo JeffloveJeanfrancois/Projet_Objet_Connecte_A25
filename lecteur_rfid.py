@@ -9,6 +9,8 @@ import sys
 from typing import Dict
 from carte_autorise import GestionAcces
 
+from card_manager import CardService, ReadError
+
 from card_reader import CardReader
 
 
@@ -294,94 +296,104 @@ class LecteurRFID:
 
 
     # Boucle principale 
+    # Boucle principale 
     def lancer(self):
         print(" En attente d’une carte...")
 
         try:
-
             while True:
-                #self.rfid.wait_for_tag()
+                # 1. DETECTION (PIRC522)
                 (erreur, type_carte) = self.rfid.request()
                 if erreur:
                     time.sleep(0.1)
                     continue
 
-
                 (erreur, uid_carte) = self.rfid.anticoll()
                 if erreur:
                     continue
+                
                 # Normaliser l'UID
                 uid_str = "-".join(str(octet) for octet in uid_carte)
-                print(f"Carte détectée : {uid_str}")
-
-
                 temps_actuel = time.time()
 
-                # Vérification de la carte avec json
-                uid_string = "-".join(str(octet) for octet in uid)
-                #est_autorisee, nom, statut = self._verifier_carte(uid_string) 
-
-                #verification avec fichier csv 
-                est_autorisee, nom, statut = self.gestion_acces.verifier_carte(uid_string)
-
-                # Vérification de la carte
-                #est_autorisee, nom, statut = self._verifier_carte(uid_string) code a daniel
+                # 2. ANTI-REBOND (Si c'est la même carte qu'il y a 2 sec, on ignore)
+                if self.derniere_carte == uid_str and (temps_actuel - self.dernier_temps) < self.delai_lecture:
+                    continue
                 
-                # Affichage + bip + enregistrement
+                print(f"Carte détectée : {uid_str}")
+
+                # 3. LECTURE DES BLOCS PHYSIQUES (MFRC522)
+                # On essaie de lire les infos fraîches sur la carte
+                print("Tentative de lecture des blocs internes...")
+                
+                # Valeurs par défaut si la lecture échoue
+                id_lu_carte = ""     
+                credits_lu_carte = 0 
+
+                try:
+                    # On utilise self.mifare qui est déjà initialisé (plus sûr)
+                    service_carte = CardService(self.mifare)
+                    
+                    # Lecture ID (Bloc 4)
+                    try:
+                        id_lu_carte = service_carte.read_card_id(uid_carte)
+                        print(f"-> ID lu sur la carte : {id_lu_carte}")
+                    except ReadError:
+                        print("-> Impossible de lire l'ID (Bloc 4) ou carte vide")
+
+                    # Lecture Crédits (Bloc 5)
+                    try:
+                        credits_lu_carte = service_carte.read_counter(uid_carte)
+                        print(f"-> Crédits lus sur la carte : {credits_lu_carte}")
+                    except ReadError:
+                        print("-> Impossible de lire les Crédits (Bloc 5)")
+
+                    # 4. MISE A JOUR DU CSV
+                    # On sauvegarde immédiatement ce qu'on a lu dans le fichier
+                    if id_lu_carte or credits_lu_carte:
+                        self.gestion_acces.mettre_a_jour_infos(uid_str, credits_lu_carte, id_lu_carte)
+
+                except Exception as e:
+                    print(f"Conflit technique lecture blocs (normal en mode hybride) : {e}")
+
+                # 5. VERIFICATION ET DECISION
+                # Maintenant que le CSV est à jour, on vérifie si on ouvre
+                est_autorisee, nom, statut, credits_csv, id_perso_csv = self.gestion_acces.verifier_carte(uid_str)
+
+                # Affichage console
                 date = time.strftime("%Y-%m-%d %H:%M:%S")
                 self.afficher_carte(type_carte, uid_carte)
                 print(f"Nom: {nom}")
-                print(f"Statut: {statut}")
+                print(f"ID Carte : {id_perso_csv}")
+                print(f"Crédits  : {credits_csv}")
+                print(f"Statut   : {statut}")
                 
-                if self.derniere_carte == uid_string and (temps_actuel - self.dernier_temps) < self.delai_lecture:
-                    print("Cette carte a déjà été utilisée il y a moins de 5 secondes, veuillez patienter un peu...")
-                    time.sleep(0.5)
-                    continue
-                
-
+                # 6. ACTION (LED + BIP)
                 if est_autorisee:
+                    self.gestion_led(0.3) # Petit flash vert/rouge ou juste vert selon ta fonction
+                    # Tu peux remettre ton code spécifique LED ici si tu préfères
                     GPIO.output(self.led_verte, GPIO.HIGH)
                     self.bip(0.2)  
                     GPIO.output(self.led_verte, GPIO.LOW)
+                    
+                    # Gestion Admin
+                    if nom.lower() == "admin":
+                        self._gerer_admin(uid_str, uid_carte)
                 else:
                     GPIO.output(self.led_rouge, GPIO.HIGH)
                     self.bip(0.8)  
                     GPIO.output(self.led_rouge, GPIO.LOW)
 
-                if est_autorisee and nom.lower() == "admin":
-                    question_data = self.questions_admin.get(uid_string)
-                    if question_data:
-                        print(f"[SECURITE] Question pour admin : {question_data['question']}")
-
-                        tentatives = 3
-                        while tentatives > 0:
-                            reponse = input("Votre réponse : ").strip()
-                            if reponse.lower() == question_data['reponse'].strip().lower():
-                                print("[INFO] Réponse correcte. Accès admin autorisé.")
-                                self.interface_admin(uid_carte)
-                                break
-                            else:
-                                tentatives -= 1
-                                print(f"[ALERTE] Réponse incorrecte. Il vous reste {tentatives} tentatives.")
-                        if tentatives == 0:
-                            print("[ALERTE] Accès admin refusé définitivement.")
-
-                    else:
-                        print("[INFO] Pas de question de sécurité trouvée. Accès admin autorisé.")
-                        self.interface_admin(uid_carte)
-
-                
+                # 7. LOG
                 self.publier_info_carte(date, type_carte, uid_carte)
                 self.enregistrer(type_carte, uid_carte, nom, statut)
 
-
-                # Mémorisation de la dernière carte
-                #self.derniere_carte = uid
-                self.derniere_carte = uid_string
+                # Mémorisation
+                self.derniere_carte = uid_str
                 self.dernier_temps = temps_actuel
 
         except KeyboardInterrupt:
-            print("\n Arrêt du programme par l’utilisateur.")
+            print("\n Arrêt du programme.")
         finally:
             try:
                 GPIO.cleanup()
@@ -389,6 +401,24 @@ class LecteurRFID:
                 pass
             self.rfid.cleanup()
             print(" Nettoyage terminé.")
+
+    # Petite fonction aide pour sortir la logique admin de la boucle principale
+    def _gerer_admin(self, uid_string, uid_carte):
+        question_data = self.questions_admin.get(uid_string)
+        if question_data:
+            print(f"[SECURITE] Question pour admin : {question_data['question']}")
+            tentatives = 3
+            while tentatives > 0:
+                reponse = input("Votre réponse : ").strip()
+                if reponse.lower() == question_data['reponse'].strip().lower():
+                    print("[INFO] Accès admin autorisé.")
+                    self.interface_admin(uid_carte)
+                    break
+                else:
+                    tentatives -= 1
+                    print(f"Incorrect. Reste {tentatives} essais.")
+        else:
+            self.interface_admin(uid_carte)
 
 
 
