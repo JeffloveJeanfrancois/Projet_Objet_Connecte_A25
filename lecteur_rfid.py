@@ -18,18 +18,24 @@ class LecteurRFID:
                  nom_fichier="journal_rfid.csv",
                  led_rouge=38,
                  led_verte=40,
-                 broker="192.168.40.122",
+                 broker="10.4.1.113",
                  port=1883,
-                 sujet_log="LecteurRFID/log"
+                 sujet_log="LecteurRFID/log",
+                 fichier_cartes="cartes_autorisees.json"
                  ):
 
         # Configuration GPIO
+        GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BOARD)
 
         self.rfid = RFID(pin_irq=None)
         self.buzzer = broche_buzzer
         self.led_rouge = led_rouge
         self.led_verte = led_verte
+
+        GPIO.setup(self.led_verte, GPIO.OUT)  # <-- AJOUTEZ CECI
+        GPIO.setup(self.led_rouge, GPIO.OUT)  # <-- AJOUTEZ CECI
+        GPIO.setup(self.buzzer, GPIO.OUT)     # <-- AJOUTEZ CECI
 
         # Gestion accès (LED + buzzer + console)
         self.acces = GestionAcces(
@@ -41,7 +47,7 @@ class LecteurRFID:
         self.delai_lecture = delai_lecture
         self.nom_fichier = nom_fichier
         self.fichier_cartes = fichier_cartes
-        self.cartes_autorisees = self._charger_cartes_autorisees()
+        #self.cartes_autorisees = self._charger_cartes_autorisees()
 
         self.derniere_carte = None
         self.dernier_temps = 0
@@ -53,6 +59,7 @@ class LecteurRFID:
 
         self.client = mqtt.Client()
         self.client.connect(self.broker, self.port, 60)
+
 
         # Création du fichier CSV si inexistant
         if not os.path.exists(nom_fichier):
@@ -88,6 +95,8 @@ class LecteurRFID:
         self.client.loop()
 
         print(f"Info carte envoyée sur MQTT : {info_carte}")
+        # Fichier: lecteur_rfid.py (Ajoutez cette méthode dans la classe LecteurRFID)
+
 
     # ---------------------------------------------------
     # Boucle principale
