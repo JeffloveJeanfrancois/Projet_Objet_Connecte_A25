@@ -9,7 +9,8 @@ def main():
         delai_lecture=2,
         broker="10.4.1.113",  
         port=1883,
-        sujet_log="LecteurRFID/log"    
+        sujet_log="LecteurRFID/log",
+        fichier_cartes="cartes_autorisees.json"  
     )
 
     # Lance la détection en boucle
