@@ -1,13 +1,16 @@
 from lecteur_rfid import LecteurRFID  # importe la classe simplifiée
+   #from typing import dict
+
 
 def main():
     # Création du lecteur RFID
     lecteur = LecteurRFID(
         broche_buzzer=33,   
         delai_lecture=2,
-        broker="192.168.40.122",  
+        broker="10.4.1.113",  
         port=1883,
-        sujet_log="LecteurRFID/log"    
+        sujet_log="LecteurRFID/log",
+        fichier_cartes="cartes_autorisees.json"  
     )
 
     # Lance la détection en boucle
