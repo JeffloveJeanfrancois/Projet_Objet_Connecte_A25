@@ -7,7 +7,7 @@
         },
         {
             "uid": "234-187-172-174-83",
-            "nom": "Poulou",
+            "nom": "Patrick",
             "actif": true
         },
         {
@@ -18,6 +18,11 @@
         {
             "uid": "250-152-169-174-101",
             "nom": "Admin",
+            "actif": true
+        },
+        {
+            "uid": "154-171-133-173-25",
+            "nom": "Jean",
             "actif": true
         }
     ]

@@ -6,8 +6,26 @@ from typing import List, Dict, Optional
 
 class HistoriqueDesAcces:
     def __init__(self):
-        self.fichier_historique = "journal_rfid.csv"
-        self.fichier_cartes = "cartes_autorisees.json"
+
+        # Dossier du script principal
+        #base_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # Chemins vers les fichiers dans le dossier data
+        #self.fichier_cartes = os.path.join(base_dir, "data", "cartes_autorisees.json")
+        #self.fichier_historique = os.path.join(base_dir, "data", "journal_rfid.csv")
+        
+        #self.fichier_historique = "journal_rfid.csv"
+        #self.fichier_historique = "data/journal_rfid.csv"
+        #self.fichier_cartes = "cartes_autorisees.json"
+        #self.fichier_cartes = "carte/cartes_autorisees.json"
+
+        # Dossier du script principal
+        # Base du projet : 2 niveaux au-dessus de logs/
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+        self.fichier_cartes = os.path.join(base_dir, "data", "cartes_autorisees.json")
+        self.fichier_historique = os.path.join(base_dir, "data", "journal_rfid.csv")
+
         self.cartes_autorisees = self._charger_cartes_autorisees()
         self.entrees_historique = self._charger_historique()
     
@@ -118,6 +136,38 @@ class HistoriqueDesAcces:
         
         print("=" * 100)
         print(f"\nTotal: {len(self.entrees_historique)} entrée(s)")
+    
+    def enregistrer(self, date_heure: str, type_carte: str, uid: str, nom: str, statut: str):
+        """Ajoute une entrée au journal_rfid.csv et à la liste en mémoire."""
+        ligne = {
+            'Date/Heure': date_heure,
+            'UID': uid,
+            'Type de carte': type_carte,
+            'Nom': nom,
+            'Statut': statut
+        }
+
+        # Ajouter à la liste en mémoire
+        self.entrees_historique.append({
+            'date_heure': date_heure,
+            'uid': uid,
+            'type_carte': type_carte,
+            'nom': nom,
+            'statut': statut
+        })
+
+        # Écrire dans le fichier CSV
+        try:
+            fichier_existe = os.path.exists(self.fichier_historique)
+            with open(self.fichier_historique, 'a', newline='') as f:
+                champs = ['Date/Heure', 'UID', 'Type de carte', 'Nom', 'Statut']
+                writer = csv.DictWriter(f, fieldnames=champs)
+                if not fichier_existe:
+                    writer.writeheader()
+                writer.writerow(ligne)
+        except Exception as e:
+            print(f"Erreur lors de l'écriture dans le fichier historique: {e}")
+
 
 def main():
     historique = HistoriqueDesAcces()

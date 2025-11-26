@@ -1,0 +1,28 @@
+
+/projet_rfid
+│
+├── main.py
+│
+├── lecteur/
+│   ├── lecteur_rfid.py         → Logique de lecture RFID (boucle, gestion tags)
+│   ├── hardware.py             → LED, buzzer, GPIO
+│   ├── rfid_driver.py          → wrapper autour de RFID + anticollision + request
+│
+├── carte/
+    ├── __init__.py
+│   ├── gestion_cartes.py       → Chargement/verification/ajout cartes autorisées
+│   ├── questions_admin.py      → Gestion des questions admin
+│   ├── configuration_carte.py  → Ton fichier MFRC522 (inchangé ou simplifié)
+│
+├── admin/
+│   ├── interface_admin.py      → Toute la logique interface admin
+│   ├── menu_blocs.py           → Le menu pour lire/écrire blocs
+│
+├── logs/
+│   ├── mqtt_logger.py          → MQTT
+│   ├── historique.py           → Historisation CSV (ton fichier historique actuel)
+│
+├── data/
+│   ├── cartes_autorisees.json
+│   ├── pass.json
+│   ├── journal_rfid.csv
