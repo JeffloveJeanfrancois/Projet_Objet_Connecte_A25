@@ -21,7 +21,8 @@ class LecteurRFID:
                  broker = "192.168.40.122",
                  port = 1883,
                  sujet_log = "LecteurRFID/log",
-                 fichier_cartes = "cartes_autorisees.json"                 
+                 fichier_cartes = "cartes_autorisees.json",
+                 utiliser_mqtt = True                 
               ):
       
         GPIO.setmode(GPIO.BOARD)
@@ -49,9 +50,18 @@ class LecteurRFID:
         self.broker = broker
         self.port = port
         self.sujet_log = sujet_log
+        self.utiliser_mqtt = utiliser_mqtt
 
-        self.client = mqtt.Client()
-        self.client.connect(self.broker, self.port, 60)
+        if utiliser_mqtt:
+            self.client = mqtt.Client()
+            try:
+                self.client.connect(self.broker, self.port, 60)
+            except Exception as e:
+                print(f"[AVERTISSEMENT] Impossible de se connecter au broker MQTT: {e}")
+                print("[INFO] Le lecteur fonctionnera sans MQTT.")
+                self.utiliser_mqtt = False
+        else:
+            self.client = None
 
         # Création du fichier CSV avec en-tête s'il n'existe pas encore
         if not os.path.exists(nom_fichier):
@@ -107,11 +117,11 @@ class LecteurRFID:
         if uid in self.cartes_autorisees:
             carte_info = self.cartes_autorisees[uid]
             if carte_info['actif']:
-                return True, carte_info['nom'], "Accepté"
+                return True, carte_info['nom'], "Accepte"
             else:
-                return False, carte_info['nom'], "Carte désactivée"
+                return False, carte_info['nom'], "Carte desactivee"
         else:
-            return False, "Non renseigné", "Refusé - Carte non autorisée"
+            return False, "Non renseigne", "Refuse - Carte non autorisee"
 
     # Fonction pour enregistrer dans le CSV 
     def enregistrer(self, type_carte, uid, nom, statut):
@@ -123,6 +133,8 @@ class LecteurRFID:
             writer.writerow([date, type_carte, uid_str, nom, statut])
 
     def publier_info_carte(self, date, type_carte, uid):
+        if not self.utiliser_mqtt or self.client is None:
+            return
         uid_str = "-".join(str(octet) for octet in uid)
         info_carte = json.dumps({
             "date_heure": date,
@@ -130,9 +142,12 @@ class LecteurRFID:
             "uid": uid_str
         })
         sujet_carte = f"{self.sujet_log}/{int(time.time())}"
-        self.client.publish(sujet_carte, info_carte, qos=1, retain=False)
-        self.client.loop()
-        print(f"info carte envoyé sur {self.sujet_log} : {info_carte}")
+        try:
+            self.client.publish(sujet_carte, info_carte, qos=1, retain=False)
+            self.client.loop()
+            print(f"info carte envoye sur {self.sujet_log} : {info_carte}")
+        except Exception as e:
+            print(f"[AVERTISSEMENT] Erreur lors de la publication MQTT: {e}")
 
     def interface_admin(self, uid_admin):
         print("\n=== Mode Admin activé ===")

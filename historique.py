@@ -68,11 +68,11 @@ class HistoriqueDesAcces:
         if not statut:
             if uid in self.cartes_autorisees:
                 if self.cartes_autorisees[uid]['actif']:
-                    statut = "Accepté"  
+                    statut = "Accepte"  
                 else:
-                    statut ="Carte désactivée"
+                    statut = "Carte desactivee"
             else:
-                statut = "Refusé - Carte non autorisée"
+                statut = "Refuse - Carte non autorisee"
         
         return {
             'date_heure': date_heure,
@@ -85,46 +85,46 @@ class HistoriqueDesAcces:
     def _determiner_type_acces(self, statut: str) -> str:
         statut_lower = statut.lower()
         
-        if any(mot in statut_lower for mot in ['accepté', 'autorisé', 'autorise', 'valide', 'succès']):
-            return 'autorisé'
-        elif any(mot in statut_lower for mot in ['désactivé', 'desactive', 'carte désactivée']):
-            return 'désactivé'
-        elif any(mot in statut_lower for mot in ['alerte', 'suspicieux', 'tentative', 'illégitime']):
+        if any(mot in statut_lower for mot in ['accepte', 'autorise', 'valide', 'succes']):
+            return 'autorise'
+        elif any(mot in statut_lower for mot in ['desactive', 'carte desactivee']):
+            return 'desactive'
+        elif any(mot in statut_lower for mot in ['alerte', 'suspicieux', 'tentative', 'illegitime']):
             return 'alerte'
-        elif any(mot in statut_lower for mot in ['refusé', 'refuse', 'refus', 'non autorisé', 'invalide']):
-            return 'refusé'
+        elif any(mot in statut_lower for mot in ['refuse', 'refus', 'non autorise', 'invalide']):
+            return 'refuse'
         else:
-            return 'indéterminé'
+            return 'indetermine'
     
     def afficher_historique(self):
         if not self.entrees_historique:
-            print("Erreur: Aucune entrée dans l'historique.")
+            print("Erreur: Aucune entree dans l'historique.")
             sys.exit(1)
         
-        # En-tête
+        # En-tete
         print("\n" + "=" * 100)
-        print("HISTORIQUE DES ACCÈS")
+        print("HISTORIQUE DES ACCES")
         print("=" * 100)
-        print(f"{'Date/Heure':<20} | {'UID':<25} | {'Nom':<20} | {'Type':<8} | {'Résultat':<15}")
+        print(f"{'Date/Heure':<20} | {'UID':<25} | {'Nom':<20} | {'Type':<8} | {'Resultat':<15}")
         print("-" * 100)
         
-        # Affichage des entrées
+        # Affichage des entrees
         for entree in self.entrees_historique:
             type_acces = self._determiner_type_acces(entree['statut'])
-            resultat = type_acces.upper() if type_acces != 'indéterminé' else entree['statut']
+            resultat = type_acces.upper() if type_acces != 'indetermine' else entree['statut']
             
             print(f"{entree['date_heure']:<20} | {entree['uid']:<25} | {entree['nom']:<20} | "
                   f"{entree['type_carte']:<8} | {resultat:<15}")
         
         print("=" * 100)
-        print(f"\nTotal: {len(self.entrees_historique)} entrée(s)")
+        print(f"\nTotal: {len(self.entrees_historique)} entree(s)")
 
     def filtrer_historique(self, filtre_choisi: str) -> dict:
        
         filtre = filtre_choisi.lower()
         entrees_filtrees = []
         
-        # Filtrage des entrées
+        # Filtrage des entrees
         for entree in self.entrees_historique:
             type_acces = self._determiner_type_acces(entree['statut'])
             
@@ -134,11 +134,11 @@ class HistoriqueDesAcces:
                 entrees_filtrees.append(entree_complete)
         
         statistiques = {
-            'autorisé': 0,
-            'refusé': 0,
+            'autorise': 0,
+            'refuse': 0,
             'alerte': 0,
-            'désactivé': 0,
-            'indéterminé': 0
+            'desactive': 0,
+            'indetermine': 0
         }
         
         for entree in self.entrees_historique:
@@ -154,11 +154,11 @@ class HistoriqueDesAcces:
         }
     
     def afficher_filtre(self, filtre: str):
-        """Affiche l'historique filtré de manière simplifiée"""
+        """Affiche l'historique filtre de maniere simplifiee"""
         resultat = self.filtrer_historique(filtre)
         
         print(f"\n=== FILTRE: {resultat['filtre_applique'].upper()} ===")
-        print(f"Résultats: {resultat['nombre_filtre']} / {resultat['nombre_total']} entrées\n")
+        print(f"Resultats: {resultat['nombre_filtre']} / {resultat['nombre_total']} entrees\n")
         
         if resultat['entrees']:
             print(f"{'Date/Heure':<20} | {'Type':<10} | {'UID':<20} | {'Nom':<20} | {'Statut':<15}")
@@ -167,19 +167,19 @@ class HistoriqueDesAcces:
                 print(f"{entree['date_heure']:<20} | {entree['type_carte']:<10} | {entree['uid']:<20} | "
                       f"{entree['nom']:<20} | {entree['type_acces'].upper():<15}")
         else:
-            print(f"Aucune entrée pour le filtre '{filtre}'")
+            print(f"Aucune entree pour le filtre '{filtre}'")
 
 
 def afficher_menu():
-    """Affiche le menu de sélection des filtres"""
+    """Affiche le menu de selection des filtres"""
     print("\n" + "=" * 60)
     print("MENU DE FILTRAGE")
     print("=" * 60)
-    print("1. Afficher tous les accès")
-    print("2. Afficher uniquement les accès AUTORISÉS")
-    print("3. Afficher uniquement les accès REFUSÉS")
+    print("1. Afficher tous les acces")
+    print("2. Afficher uniquement les acces AUTORISES")
+    print("3. Afficher uniquement les acces REFUSES")
     print("4. Afficher uniquement les ALERTES")
-    print("5. Afficher uniquement les cartes DÉSACTIVÉES")
+    print("5. Afficher uniquement les cartes DESACTIVEES")
     print("6. Afficher les statistiques globales")
     print("0. Quitter")
     print("=" * 60)
@@ -195,37 +195,37 @@ def main():
             choix = input("\nVotre choix: ").strip()
             
             if choix == '0':
-                print("\nArrêt de l'historique")
+                print("\nArret de l'historique")
                 break
             elif choix == '1':
                 historique.afficher_historique()
             elif choix == '2':
-                historique.afficher_filtre('autorisé')
+                historique.afficher_filtre('autorise')
             elif choix == '3':
-                historique.afficher_filtre('refusé')
+                historique.afficher_filtre('refuse')
             elif choix == '4':
                 historique.afficher_filtre('alerte')
             elif choix == '5':
-                historique.afficher_filtre('désactivé')
+                historique.afficher_filtre('desactive')
             elif choix == '6':
                 resultat = historique.filtrer_historique('tous')
                 print("\n=== STATISTIQUES GLOBALES ===")
-                print(f"Total: {resultat['nombre_total']} entrées\n")
+                print(f"Total: {resultat['nombre_total']} entrees\n")
                 
                 for type_acces, count in resultat['statistiques'].items():
                     pourcentage = (count / resultat['nombre_total'] * 100) if resultat['nombre_total'] > 0 else 0
                     print(f"{type_acces.capitalize()}: {count} ({pourcentage:.1f}%)")
             else:
-                print("\nChoix invalide. Veuillez sélectionner une option du menu.")
+                print("\nChoix invalide. Veuillez selectionner une option du menu.")
             
-            input("\nAppuyez sur Entrée pour continuer...")
+            input("\nAppuyez sur Entree pour continuer...")
             
         except KeyboardInterrupt:
-            print("\n\nInterruption détectée. Au revoir!")
+            print("\n\nInterruption detectee. Au revoir!")
             break
         except Exception as exception:
             print(f"\nErreur: {exception}")
-            input("\nAppuyez sur Entrée pour continuer...")
+            input("\nAppuyez sur Entree pour continuer...")
 
 if __name__ == "__main__":
     main()
