@@ -7,6 +7,7 @@ import os
 import json
 import sys
 from typing import Dict
+from card_reader import CardReader
 from configuration_carte import CarteConfiguration
 
 
@@ -21,7 +22,8 @@ class LecteurRFID:
                  broker = "192.168.40.122",
                  port = 1883,
                  sujet_log = "LecteurRFID/log",
-                 fichier_cartes = "cartes_autorisees.json"                 
+                 fichier_cartes = "cartes_autorisees.json",
+                 utiliser_mqtt = True                 
               ):
       
         GPIO.setmode(GPIO.BOARD)
@@ -108,11 +110,11 @@ class LecteurRFID:
         if uid in self.cartes_autorisees:
             carte_info = self.cartes_autorisees[uid]
             if carte_info['actif']:
-                return True, carte_info['nom'], "Accepté"
+                return True, carte_info['nom'], "Accepte"
             else:
-                return False, carte_info['nom'], "Carte désactivée"
+                return False, carte_info['nom'], "Carte desactivee"
         else:
-            return False, "Non renseigné", "Refusé - Carte non autorisée"
+            return False, "Non renseigne", "Refuse - Carte non autorisee"
 
     # Fonction pour enregistrer dans le CSV 
     def enregistrer(self, uid, nom, statut):
@@ -130,9 +132,12 @@ class LecteurRFID:
             "uid": uid_str
         })
         sujet_carte = f"{self.sujet_log}/{int(time.time())}"
-        self.client.publish(sujet_carte, info_carte, qos=1, retain=False)
-        self.client.loop()
-        print(f"info carte envoyé sur {self.sujet_log} : {info_carte}")
+        try:
+            self.client.publish(sujet_carte, info_carte, qos=1, retain=False)
+            self.client.loop()
+            print(f"info carte envoye sur {self.sujet_log} : {info_carte}")
+        except Exception as e:
+            print(f"[AVERTISSEMENT] Erreur lors de la publication MQTT: {e}")
 
     def interface_admin(self, uid_admin):
         print("\n=== Mode Admin activé ===")
