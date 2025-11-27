@@ -1,5 +1,6 @@
 from lecteur_rfid import LecteurRFID  # importe la classe simplifiée
 
+
 def main():
     # Création du lecteur RFID
     lecteur = LecteurRFID(

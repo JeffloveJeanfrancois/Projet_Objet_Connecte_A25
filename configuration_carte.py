@@ -1,81 +1,101 @@
-import sys, os
-from mfrc522 import MFRC522
+from pirc522 import RFID
 
 class CarteConfiguration:
 
-    def __init__(self, CLE=[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]):
-
-        self.mfrc = MFRC522()
+    def __init__(self, rdr=None, CLE=[0xFF]*6):
+        self.rdr = rdr
         self.CLE = CLE
-    
+
+        # ensemble de cle possible
+        self.COMMON_KEYS = [
+            [0xFF]*6,
+            [0xA0]*6,
+            [0x00]*6,
+            [0xD3, 0xF7, 0xD3, 0xF7, 0xD3, 0xF7],
+            [0xA1]*6,
+            [0xB0]*6,
+        ]
+
     def est_bloc_remorque(self, numero_bloc):
         return (numero_bloc + 1) % 4 == 0
-    
-    def auth_silencieuse(self, bloc, clé, uid):
-        stdout_orig = sys.stdout
-        sys.stdout = open(os.devnull, 'w')
-        resultat = self.mfrc.MFRC522_Auth(self.mfrc.PICC_AUTHENT1A, bloc, clé, uid)
-        sys.stdout.close()
-        sys.stdout = stdout_orig
-        return resultat
+
+    def authentifier(self, uid, bloc):
+        self.rdr.select_tag(uid)  
+
+        # Essai clé principale
+        if self.rdr.card_auth(self.rdr.auth_a, bloc, self.CLE, uid) == 0:
+            return True
+
+        # Essai toutes les clés communes
+        for key in self.COMMON_KEYS:
+            if self.rdr.card_auth(self.rdr.auth_a, bloc, key, uid) == 0:
+                self.CLE = key
+                return True
+
+        return False
 
 
-    def lire_bloc(self, uid, numero_bloc):
-        if self.auth_silencieuse(numero_bloc, self.CLE, uid) != self.mfrc.MI_OK:
-            print(f"[ERREUR] Impossible de lire le bloc {numero_bloc}. Vérifie la clé ou le bloc.")
-            return None
-    
-
-        
-        data = self.mfrc.MFRC522_Read(numero_bloc)
-        self.mfrc.MFRC522_StopCrypto1()
-        
-        if data is None:
-            print("Lecture impossible")
+    def lire_bloc(self, uid, bloc):
+        if self.est_bloc_remorque(bloc):
+            print(f"[INFO] Bloc {bloc} est un trailer — lecture interdite.")
             return None
 
-        try:
-            return bytes(data).decode("utf-8", errors="ignore")
-        except:
-            return "".join(chr(x) for x in data if 32 <= x <= 126)
-        
+        if not self.authentifier(uid, bloc):
+            print(f"[ERREUR] Auth échouée bloc {bloc}")
+            return None
+
+        status, data = self.rdr.read(bloc)
+        self.rdr.stop_crypto()
+
+        if status != 0 or data is None:
+            print(f"[ERREUR] Lecture bloc {bloc} impossible")
+            return None
+
+        texte = ''.join(chr(x) if 32 <= x <= 126 else '.' for x in data)
+        hexdata = " ".join(f"{x:02X}" for x in data)
+        print(f"[Bloc {bloc}] {hexdata} | {texte}")
+
+        return data
+
+
+    def ecrire_bloc(self, uid, bloc, texte):
+        if self.est_bloc_remorque(bloc):
+            print(f"[ERREUR] Bloc trailer {bloc}, écriture interdite.")
+            return False
+
+        # Authentification avec toutes les clés 
+        if not self.authentifier(uid, bloc):
+            print(f"[ERREUR] Auth échouée bloc {bloc}")
+            return False
+
+        # Préparer les 16 octets
+        data = list(texte.encode("utf-8")[:16])
+        data += [0] * (16 - len(data))
+
+        # Écriture du bloc
+        status = self.rdr.write(bloc, data)
+        self.rdr.stop_crypto()
+
+        if status != 0:
+            print(f"[ERREUR] Écriture échouée bloc {bloc}")
+            return False
+
+        print(f"[INFO] Bloc {bloc} écrit avec succès : {texte}")
+
+        # Relire immédiatement pour afficher le contenu réel
+        contenu_lu = self.lire_bloc(uid, bloc)
+        if contenu_lu:
+            texte_lu = ''.join(chr(x) if 32 <= x <= 126 else '.' for x in contenu_lu)
+            print(f"[INFO] Contenu réel du bloc {bloc} après écriture : {texte_lu}")
+
+        return True
 
 
     def lire_blocs(self, uid, blocs):
-
-        texte_total = ''
-
+        texte_total = ""
         for bloc in blocs:
             if not self.est_bloc_remorque(bloc):
-                print(f"Lecture du bloc {bloc}")
-                mot = self.lire_bloc(uid, bloc)
-                if mot:
-                    texte_total += mot
+                data = self.lire_bloc(uid, bloc)
+                if data:
+                    texte_total += ''.join(chr(x) if 32 <= x <= 126 else '.' for x in data)
         return texte_total
-
-    
-    
-    def ecrire_bloc(self, uid, numero_bloc, texte):
-
-        if self.est_bloc_remorque(numero_bloc):
-            raise ValueError(f"Impossible d’écrire dans un bloc remorque : {numero_bloc}")
-
-        # Authentification
-        if self.auth_silencieuse(
-            numero_bloc,
-            self.CLE,
-            uid
-        ) != self.mfrc.MI_OK:
-            print(f"[ERREUR] Impossible d’écrire sur le bloc {numero_bloc}. Vérifie la clé ou le bloc.")
-            return False
-
-        data = texte.encode("utf-8")[:16]
-        data = data.ljust(16, b'\x00')
-        succes = self.mfrc.MFRC522_Write(numero_bloc, list(data)) == self.mfrc.MI_OK
-        self.mfrc.MFRC522_StopCrypto1()  
-
-        if not succes:
-            print(f"[ERREUR] Écriture échouée bloc {numero_bloc}")
-        return succes
- 
-
