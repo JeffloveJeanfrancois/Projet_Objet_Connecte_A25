@@ -18,7 +18,7 @@ def charger_cartes_autorisees():
                     cartes[uid] = item
         return cartes
     except FileNotFoundError:
-        print(f"Erreur: Le fichier des cartes autorisées {FICHIER_CARTES} est introuvable.")
+        print(f"Erreur: Le fichier des cartes autorisees {FICHIER_CARTES} est introuvable.")
         return {}
     except json.JSONDecodeError:
         print(f"Erreur: Le fichier {FICHIER_CARTES} n'est pas un JSON valide.")
@@ -53,6 +53,6 @@ def identifier_carte(uid):
             return False, nom
 
     else:
-        print("Accès refusé – Carte inconnue")
+        print("Acces refuse – Carte inconnue")
         enregistrer_historique(carte_id, "inconnu", "refuse")
         return False, "Inconnu"
