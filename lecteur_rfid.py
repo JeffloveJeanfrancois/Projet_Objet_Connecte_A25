@@ -10,6 +10,7 @@ from typing import Dict
 from carte_autorise import GestionAcces
 
 from card_reader import CardReader
+from configuration_carte import CarteConfiguration
 
 
 class LecteurRFID:
@@ -45,6 +46,7 @@ class LecteurRFID:
         self.cartes_autorisees = self._charger_cartes_autorisees()
         self.gestion_acces = GestionAcces(self.fichier_cartes_csv)
         self.mifare = CardReader()
+        self.mifare = CarteConfiguration(rdr=self.rfid)
         self.questions_admin = self._charger_questions_admin("pass.json")
 
 
@@ -55,25 +57,16 @@ class LecteurRFID:
         self.broker = broker
         self.port = port
         self.sujet_log = sujet_log
-        self.utiliser_mqtt = utiliser_mqtt
 
-        if utiliser_mqtt:
-            self.client = mqtt.Client()
-            try:
-                self.client.connect(self.broker, self.port, 60)
-            except Exception as e:
-                print(f"[AVERTISSEMENT] Impossible de se connecter au broker MQTT: {e}")
-                print("[INFO] Le lecteur fonctionnera sans MQTT.")
-                self.utiliser_mqtt = False
-        else:
-            self.client = None
+
+        self.client = mqtt.Client()
+        self.client.connect(self.broker, self.port, 60)
 
         # Création du fichier CSV s'il n'existe pas encore
         if not os.path.exists(nom_fichier):
             with open(nom_fichier, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
-                writer.writerow(["Date/Heure", "Type de carte", "UID", "Nom", "Statut"])
-        self.gestion_acces.creer_fichier_si_absent()
+                writer.writerow(["Date/Heure", "UID", "Nom", "Statut"])
 
         print("Lecteur RFID prêt. Approchez une carte !")
 
@@ -112,10 +105,10 @@ class LecteurRFID:
         GPIO.output(self.led_rouge, GPIO.LOW)
 
     # Fonction pour afficher les infos de la carte 
-    def afficher_carte(self, type_carte, uid):
+    def afficher_carte(self, uid):
         #uid_hex = ' '.join(f'{octet:02X}' for octet in uid)
         print("\n####### Nouvelle carte détectée #######")
-        print(f"Type : {type_carte}")
+    
         print(f"UID  : {uid}")
         print("****************************************")
 
@@ -130,21 +123,18 @@ class LecteurRFID:
             return False, "Non renseigne", "Refuse - Carte non autorisee"
 
     # Fonction pour enregistrer dans le CSV 
-    def enregistrer(self, type_carte, uid, nom, statut):
+    def enregistrer(self, uid, nom, statut):
         date = time.strftime("%Y-%m-%d %H:%M:%S")
         uid_str = "-".join(str(octet) for octet in uid)
         
         with open(self.nom_fichier, 'a', newline='', encoding='utf-8') as fichier_csv:
             writer = csv.writer(fichier_csv)
-            writer.writerow([date, type_carte, uid_str, nom, statut])
+            writer.writerow([date, uid_str, nom, statut])
 
-    def publier_info_carte(self, date, type_carte, uid):
-        if not self.utiliser_mqtt or self.client is None:
-            return
+    def publier_info_carte(self, date, uid):
         uid_str = "-".join(str(octet) for octet in uid)
         info_carte = json.dumps({
             "date_heure": date,
-            "type_carte": type_carte,
             "uid": uid_str
         })
         sujet_carte = f"{self.sujet_log}/{int(time.time())}"
@@ -169,7 +159,7 @@ class LecteurRFID:
 
                 uid_carte = None
                 while uid_carte is None:
-                    (erreur, type_carte) = self.rfid.request()
+                    (erreur, uid_carte) = self.rfid.request()
                     if erreur:
                         time.sleep(0.1)
                         continue
@@ -224,7 +214,7 @@ class LecteurRFID:
 
 
 
-    def menu_configuration_blocs(self, uid):
+    def menu_configuration_blocs(self, uid_admin):
 
         while True:
             print("\n--- Menu Bloc ---")
@@ -235,11 +225,14 @@ class LecteurRFID:
 
             if choix == "1":
                 bloc = int(input("Numéro du bloc à lire : "))
+                
                 if self.mifare.est_bloc_remorque(bloc):
                     print(f"[INFO] Bloc {bloc} est un bloc remorque, lecture impossible")
                     continue
 
-                contenu = self.mifare.lire_bloc(uid, bloc)
+                uid_carte = self.attendre_carte()
+
+                contenu = self.mifare.lire_bloc(uid_carte, bloc)
                 #print(f"Contenu du bloc {bloc} : {contenu}")
                 if contenu is None:
                     print(f"[ERREUR] Impossible de lire le bloc {bloc}. Vérifie la clé ou le bloc.")
@@ -248,14 +241,23 @@ class LecteurRFID:
 
             elif choix == "2":
                 bloc = int(input("Numéro du bloc à écrire : "))
+
                 if self.mifare.est_bloc_remorque(bloc):
                     print(f"[ERREUR] Impossible d’écrire dans un bloc remorque ({bloc}) !")
                     continue
 
                 texte = input("Texte à écrire (max 16 caractères) : ")
-                succes = self.mifare.ecrire_bloc(uid, bloc, texte)
+
+                uid_carte = self.attendre_carte()
+
+                if not uid_carte:
+                    print("Aucune carte detectee.")
+                    continue
+
+                succes = self.mifare.ecrire_bloc(uid_carte, bloc, texte)
                 if succes:
-                    print(f"[INFO] Écriture réussie sur le bloc {bloc}")
+                    # Contenu réel déjà affiché dans ecrire_bloc()
+                    print(f"[INFO] Écriture confirmée sur le bloc {bloc}: {succes}")
                 else:
                     print(f"[ERREUR] Écriture impossible sur le bloc {bloc}. Vérifie la clé ou le bloc.")
 
@@ -265,6 +267,21 @@ class LecteurRFID:
                 break
             else:
                 print("Choix invalide, réessayez.")
+
+    
+    
+
+    def attendre_carte(self):
+        print("Approchez une carte…")
+        while True:
+            (error, uid) = self.mifare.rdr.request()
+            if not error:
+                (error, uid) = self.mifare.rdr.anticoll()
+                if not error:
+                    #print(f"Carte détectée : {uid}")
+                    return uid
+            time.sleep(0.1)
+
 
 
     def _sauvegarder_cartes(self):
@@ -315,19 +332,11 @@ class LecteurRFID:
         try:
 
             while True:
-                #self.rfid.wait_for_tag()
-                (erreur, type_carte) = self.rfid.request()
-                if erreur:
-                    time.sleep(0.1)
-                    continue
-
-
-                (erreur, uid_carte) = self.rfid.anticoll()
-                if erreur:
-                    continue
+                uid_carte = self.attendre_carte()
+                                                                                                                                                                                                                                            
                 # Normaliser l'UID
-                uid_str = "-".join(str(octet) for octet in uid_carte)
-                print(f"Carte détectée : {uid_str}")
+                #uid_str = "-".join(str(octet) for octet in uid_carte)
+                #print(f"Carte détectée : {uid_str}")
 
 
                 temps_actuel = time.time()
@@ -344,7 +353,7 @@ class LecteurRFID:
                 
                 # Affichage + bip + enregistrement
                 date = time.strftime("%Y-%m-%d %H:%M:%S")
-                self.afficher_carte(type_carte, uid_carte)
+                self.afficher_carte(uid_carte)
                 print(f"Nom: {nom}")
                 print(f"Statut: {statut}")
                 
@@ -386,8 +395,8 @@ class LecteurRFID:
                         self.interface_admin(uid_carte)
 
                 
-                self.publier_info_carte(date, type_carte, uid_carte)
-                self.enregistrer(type_carte, uid_carte, nom, statut)
+                self.publier_info_carte(date, uid_carte)
+                self.enregistrer(uid_carte, nom, statut)
 
 
                 # Mémorisation de la dernière carte
@@ -395,8 +404,6 @@ class LecteurRFID:
                 self.derniere_carte = uid_string
                 self.dernier_temps = temps_actuel
 
-        except KeyboardInterrupt:
-            print("\n Arrêt du programme par l’utilisateur.")
         finally:
             try:
                 GPIO.cleanup()
