@@ -5,6 +5,12 @@ import time
 import csv
 import os
 import json
+
+
+
+from gestion_acces import GestionAcces           # LEDs + buzzer + messages
+from verification import identifier_carte      # vérifie si la carte est autorisée
+from affichage_qapass import AffichageQapass
 import sys
 from typing import Dict
 from card_reader import CardReader
@@ -13,19 +19,21 @@ from configuration_carte import CarteConfiguration
 
 class LecteurRFID:
 
-    def __init__(self, 
-                 broche_buzzer=33, 
-                 delai_lecture=2, 
-                 nom_fichier = "journal_rfid.csv",
-                 led_rouge = 38,
-                 led_verte = 40,
-                 broker = "192.168.40.122",
-                 port = 1883,
-                 sujet_log = "LecteurRFID/log",
-                 fichier_cartes = "cartes_autorisees.json",
-                 utiliser_mqtt = True                 
-              ):
-      
+    def __init__(self,
+                 broche_buzzer=33,
+                 delai_lecture=2,
+                 nom_fichier="journal_rfid.csv",
+                 led_rouge=38,
+                 led_verte=40,
+                 broker="10.4.1.164",
+                 port=1883,
+                 sujet_log="LecteurRFID/log",
+                 fichier_cartes="cartes_autorisees.json",
+                 utiliser_mqtt = True
+                 ):
+
+        # Configuration GPIO
+        GPIO.setwarnings(False)     
         GPIO.setmode(GPIO.BOARD)
         GPIO.setwarnings(False)
         GPIO.setup(broche_buzzer, GPIO.OUT)
@@ -36,6 +44,21 @@ class LecteurRFID:
         self.buzzer = broche_buzzer
         self.led_rouge = led_rouge
         self.led_verte = led_verte
+
+        GPIO.setup(self.led_verte, GPIO.OUT)  # <-- AJOUTEZ CECI
+        GPIO.setup(self.led_rouge, GPIO.OUT)  # <-- AJOUTEZ CECI
+        GPIO.setup(self.buzzer, GPIO.OUT)     # <-- AJOUTEZ CECI
+
+        self.ecran = AffichageQapass()
+
+        # Gestion accès (LED + buzzer + console)
+        self.acces = GestionAcces(
+            led_verte=self.led_verte,
+            led_rouge=self.led_rouge,
+            buzzer=self.buzzer,
+            ecran=self.ecran
+        )
+
         self.delai_lecture = delai_lecture
         self.nom_fichier = nom_fichier
         self.fichier_cartes = fichier_cartes
@@ -321,7 +344,9 @@ class LecteurRFID:
 
     # Boucle principale 
     def lancer(self):
-        print(" En attente d’une carte...")
+        print("En attente d’une carte...")
+        if self.ecran:
+            self.ecran.accueil()
 
         try:
 
@@ -351,20 +376,39 @@ class LecteurRFID:
                     continue
                 
 
-                if est_autorisee:
-                    GPIO.output(self.led_verte, GPIO.HIGH)
-                    self.bip(0.2)  
-                    GPIO.output(self.led_verte, GPIO.LOW)
+                print("\n===== Carte détectée =====")
+                print("UID :", uid_carte)
+
+                # Vérification d’accès
+                carte_ok, nom_utilisateur = identifier_carte(uid_carte)
+
+                if carte_ok:
+                    self.acces.carte_acceptee(nom=nom_utilisateur)
+                    acces = "accepte"
+                    # On affiche un message sur l'écran <--- AJOUT
+                    # On suppose que identifier_carte affiche le nom.
+                    # self.ecran.afficher(
+                    #     ligne1="ACCES ACCEPTE", 
+                    #     ligne2="Bienvenue!", 
+                    #     duree=2
+                    # )
                 else:
-                    GPIO.output(self.led_rouge, GPIO.HIGH)
-                    self.bip(0.8)  
-                    GPIO.output(self.led_rouge, GPIO.LOW)
+                    self.acces.carte_refusee()
+                    acces = "refuse"
+                    # On affiche un message d'erreur sur l'écran <--- AJOUT
+                    # self.ecran.afficher(
+                    #     ligne1="ACCES REFUSE", 
+                    #     ligne2="Carte invalide", 
+                    #     duree=2
+                    # )
 
                 if est_autorisee and nom.lower() == "admin":
                     question_data = self.questions_admin.get(uid_string)
                     if question_data:
                         print(f"[SECURITE] Question pour admin : {question_data['question']}")
 
+                # Mémorisation pour éviter les doublons..............................................................
+                        self.derniere_carte = uid_string
                         tentatives = 3
                         while tentatives > 0:
                             reponse = input("Votre réponse : ").strip()
@@ -382,9 +426,9 @@ class LecteurRFID:
                         print("[INFO] Pas de question de sécurité trouvée. Accès admin autorisé.")
                         self.interface_admin(uid_carte)
 
-                
-                self.publier_info_carte(date, uid_carte)
-                self.enregistrer(uid_carte, nom, statut)
+                        
+                        self.publier_info_carte(date, uid_carte)
+                        self.enregistrer(uid_carte, nom, statut)
 
 
                 # Mémorisation de la dernière carte

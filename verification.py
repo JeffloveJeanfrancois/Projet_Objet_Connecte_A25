@@ -46,13 +46,13 @@ def identifier_carte(uid):
         if actif:
             print(f"Bienvenue {nom}")
             enregistrer_historique(carte_id, nom, "accepte")
-            return True
+            return True, nom
         else:
-            print(f"Acces refuse – Carte desactivee pour {nom}")
-            enregistrer_historique(carte_id, nom, "refuse (desactivee)")
-            return False
+            print(f"Accès refusé – Carte désactivée pour {nom}")
+            enregistrer_historique(carte_id, nom, "refuse (désactivée)")
+            return False, nom
 
     else:
         print("Acces refuse – Carte inconnue")
         enregistrer_historique(carte_id, "inconnu", "refuse")
-        return False
+        return False, "Inconnu"
