@@ -1,3 +1,6 @@
+from card_reader import CardReader
+from configuration_carte import CarteConfiguration
+
 # ---- Conversion helpers ----
 def str_to_block(s: str) -> bytes:
     b = s.encode("ascii")[:16]
@@ -41,19 +44,17 @@ class CardService:
     BLOCK_COUNTER = 5
     MAX_COUNTER = 999
 
-    def __init__(self, reader):
+    def __init__(self, reader: CardReader):
         self.reader = reader
 
     # ---- ID ----
     def read_card_id(self, uid):
-        # CORRECTION ICI: on utilise lire_bloc (français) au lieu de read_block
         data = self.reader.lire_bloc(uid, self.BLOCK_ID)
         if not data:
             raise ReadError(uid)
         return block_to_str(data)
 
     def write_card_id(self, uid, card_id: str):
-        # CORRECTION ICI: on utilise ecrire_bloc (français)
         success = self.reader.ecrire_bloc(uid, self.BLOCK_ID, str_to_block(card_id))
         if not success:
             raise WriteError(uid)
@@ -61,14 +62,12 @@ class CardService:
 
     # ---- COUNTER ----
     def read_counter(self, uid):
-        # CORRECTION ICI: on utilise lire_bloc (français)
         data = self.reader.lire_bloc(uid, self.BLOCK_COUNTER)
         if not data:
             raise ReadError(uid, "Impossible de lire le compteur")
         return block_to_int(data)
 
     def write_counter(self, uid, value: int):
-        # CORRECTION ICI: on utilise ecrire_bloc (français)
         success = self.reader.ecrire_bloc(uid, self.BLOCK_COUNTER, int_to_block(value))
         if not success:
             raise WriteError(uid, "Impossible de modifier le compteur")
