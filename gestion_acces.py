@@ -34,7 +34,7 @@ class GestionAcces:
             self.ecran.afficher(
                 ligne1="ACCES ACCEPTE", 
                 ligne2=f"Bienvenue {nom}"[:16], # Affiche les 16 premiers caractères
-                duree=2
+                duree=4
             )
 
     def carte_refusee(self):
@@ -47,5 +47,5 @@ class GestionAcces:
             self.ecran.afficher(
                 ligne1="ACCES REFUSE", 
                 ligne2="Carte Invalide", 
-                duree=2
+                duree=4
             )
