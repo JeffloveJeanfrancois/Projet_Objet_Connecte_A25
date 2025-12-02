@@ -16,6 +16,7 @@ from typing import Dict
 from card_reader import CardReader
 from configuration_carte import CarteConfiguration
 
+from cartes_autorisees import GestionAcces as GestionCartesCSV
 
 class LecteurRFID:
 
@@ -28,7 +29,7 @@ class LecteurRFID:
                  broker="10.4.1.164",
                  port=1883,
                  sujet_log="LecteurRFID/log",
-                 fichier_cartes="cartes_autorisees.json",
+                 fichier_cartes="cartes_autorisees.csv",       
                  utiliser_mqtt = True
                  ):
 
@@ -62,7 +63,7 @@ class LecteurRFID:
         self.delai_lecture = delai_lecture
         self.nom_fichier = nom_fichier
         self.fichier_cartes = fichier_cartes
-        self.cartes_autorisees = self._charger_cartes_autorisees()
+        self.gestion_csv = GestionCartesCSV(nom_fichier=self.fichier_cartes)
         self.mifare = CarteConfiguration(rdr=self.rfid)
         self.questions_admin = self._charger_questions_admin("pass.json")
 
@@ -87,27 +88,6 @@ class LecteurRFID:
 
         print("Lecteur RFID prêt. Approchez une carte !")
 
-    def _charger_cartes_autorisees(self) -> Dict:
-        if not os.path.exists(self.fichier_cartes):
-            print(f"Le fichier {self.fichier_cartes} n'existe pas")
-            sys.exit(1)
-        
-        try:
-            with open(self.fichier_cartes, 'r', encoding='utf-8') as fichier:
-                data = json.load(fichier)
-                resultat = {}
-                for carte in data.get('cartes', []):
-                    uid = carte.get('uid')
-                    if uid:
-                        resultat[carte['uid']] = {
-                            'nom': carte.get('nom', 'Inconnu'),
-                            'actif': carte.get('actif', False)
-                        }
-                return resultat
-        except Exception as exception:
-            print(f"Erreur lors du chargement des cartes: {exception}")
-            return {}
-
     # Fonction pour faire biper le buzzer ---
     def bip(self, duree=0.3):
         GPIO.output(self.buzzer, True)
@@ -130,14 +110,12 @@ class LecteurRFID:
         print("****************************************")
 
     def _verifier_carte(self, uid):
-        if uid in self.cartes_autorisees:
-            carte_info = self.cartes_autorisees[uid]
-            if carte_info['actif']:
-                return True, carte_info['nom'], "Accepte"
-            else:
-                return False, carte_info['nom'], "Carte desactivee"
+        est_autorisee, nom, message, _, _ = self.gestion_csv.verifier_carte(uid)
+        
+        if est_autorisee:
+            return True, nom, "Accepte"
         else:
-            return False, "Non renseigne", "Refuse - Carte non autorisee"
+            return False, nom, message
 
     # Fonction pour enregistrer dans le CSV 
     def enregistrer(self, uid, nom, statut):
@@ -188,38 +166,33 @@ class LecteurRFID:
                 uid_str = "-".join(str(octet) for octet in uid_carte)
                 print(f"Carte détectée : {uid_str}")
 
-                # Vérification si la carte existe déjà
-                if uid_str in self.cartes_autorisees:
-                    carte_info = self.cartes_autorisees[uid_str]
-                    print(f"Carte existante : Nom = {carte_info['nom']}, Actif = {carte_info['actif']}")
+                # On vérifie si elle existe déjà dans le CSV
+                existe, nom_actuel, _, _, _ = self.gestion_csv.verifier_carte(uid_str)
+                
+                # Si le nom n'est pas "Non renseigné", c'est qu'elle existe (même si inactive)
+                carte_trouvee = (nom_actuel != "Non renseigné")
+
+                if carte_trouvee:
+                    print(f"Carte existante : Nom = {nom_actuel}")
                     confirmation = input("Cette carte existe, voulez-vous écraser ses informations ? (oui/non) : ")
                     
                     if confirmation.lower() == "oui":
                         nouveau_nom = input("Entrez le nom de la carte : ").strip()
                         statut_actif = input("Activer la carte ? (oui/non) : ").strip().lower() == "oui"
-                        self.cartes_autorisees[uid_str] = {
-                            "nom": nouveau_nom,
-                            "actif": statut_actif
-                        }
-                        self._sauvegarder_cartes()
-                        print(f"Carte {uid_str} configurée : Nom = {nouveau_nom}, Actif = {statut_actif}")
+                        
+                        # Appel CSV pour mise à jour
+                        self.gestion_csv.ajouter_ou_modifier_carte(uid_str, nouveau_nom, statut_actif)
                     else:
                         print("Configuration non modifiée.")
-                        nouveau_nom = carte_info['nom']
-                        statut_actif = carte_info['actif']
 
                 else:
                     # Nouvelle carte
                     print("Nouvelle carte détectée.")
                     nouveau_nom = input("Entrez le nom de la carte : ").strip()
                     statut_actif = input("Activer la carte ? (oui/non) : ").strip().lower() == "oui"
-                    self.cartes_autorisees[uid_str] = {
-                        "nom": nouveau_nom,
-                        "actif": statut_actif
-                    }
-                    self._sauvegarder_cartes()
-                    print(f"Carte {uid_str} configurée : Nom = {nouveau_nom}, Actif = {statut_actif}")
-
+                    
+                    # Appel CSV pour ajout
+                    self.gestion_csv.ajouter_ou_modifier_carte(uid_str, nouveau_nom, statut_actif)
 
                 self.menu_configuration_blocs(uid_carte)
 
@@ -298,24 +271,6 @@ class LecteurRFID:
                     #print(f"Carte détectée : {uid}")
                     return uid
             time.sleep(0.1)
-
-
-
-    def _sauvegarder_cartes(self):
-        """Sauvegarde le dictionnaire des cartes autorisées dans le fichier JSON."""
-        data = {"cartes": []}
-        for uid, info in self.cartes_autorisees.items():
-            data["cartes"].append({
-                "uid": uid,
-                "nom": info["nom"],
-                "actif": info["actif"]
-            })
-        try:
-            with open(self.fichier_cartes, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=4, ensure_ascii=False)
-            print("[INFO] Fichier JSON mis à jour avec succès.")
-        except Exception as e:
-            print(f"[ERREUR] Impossible de sauvegarder le fichier JSON : {e}")
 
 
     def _charger_questions_admin(self, fichier_pass="pass.json") -> Dict:
