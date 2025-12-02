@@ -15,7 +15,6 @@ import sys
 from typing import Dict
 from card_reader import CardReader
 from configuration_carte import CarteConfiguration
-
 from cartes_autorisees import GestionAcces as GestionCartesCSV
 
 class LecteurRFID:
