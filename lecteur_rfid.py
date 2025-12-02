@@ -5,6 +5,12 @@ import time
 import csv
 import os
 import json
+
+
+
+from gestion_acces import GestionAcces           # LEDs + buzzer + messages
+from verification import identifier_carte      # vérifie si la carte est autorisée
+from affichage_qapass import AffichageQapass
 import sys
 from typing import Dict
 
@@ -41,6 +47,21 @@ class LecteurRFID:
         self.buzzer = broche_buzzer
         self.led_rouge = led_rouge
         self.led_verte = led_verte
+
+        GPIO.setup(self.led_verte, GPIO.OUT)  # <-- AJOUTEZ CECI
+        GPIO.setup(self.led_rouge, GPIO.OUT)  # <-- AJOUTEZ CECI
+        GPIO.setup(self.buzzer, GPIO.OUT)     # <-- AJOUTEZ CECI
+
+        self.ecran = AffichageQapass()
+
+        # Gestion accès (LED + buzzer + console)
+        self.acces = GestionAcces(
+            led_verte=self.led_verte,
+            led_rouge=self.led_rouge,
+            buzzer=self.buzzer,
+            ecran=self.ecran
+        )
+
         self.delai_lecture = delai_lecture
         self.nom_fichier = nom_fichier
         self.fichier_cartes_csv = fichier_cartes_csv
@@ -250,7 +271,10 @@ class LecteurRFID:
             print("\n[INFO] Retour au mode lecture. Approchez une carte...")
 
     def lancer(self):
-        print("En attente d'une carte...")
+        print("En attente d’une carte...")
+        if self.ecran:
+            self.ecran.accueil()
+
         try:
             while True:
                 # 1. Détection
@@ -316,6 +340,59 @@ class LecteurRFID:
                 # 5. Log
                 self.enregistrer(uid_carte, nom, statut)
                 self.publier_info_carte(time.strftime("%Y-%m-%d %H:%M:%S"), uid_carte)
+                print("\n===== Carte détectée =====")
+                print("UID :", uid_carte)
+
+                # Vérification d’accès
+                carte_ok, nom_utilisateur = identifier_carte(uid_carte)
+
+                if carte_ok:
+                    self.acces.carte_acceptee(nom=nom_utilisateur)
+                    acces = "accepte"
+                    # On affiche un message sur l'écran <--- AJOUT
+                    # On suppose que identifier_carte affiche le nom.
+                    # self.ecran.afficher(
+                    #     ligne1="ACCES ACCEPTE", 
+                    #     ligne2="Bienvenue!", 
+                    #     duree=2
+                    # )
+                else:
+                    self.acces.carte_refusee()
+                    acces = "refuse"
+                    # On affiche un message d'erreur sur l'écran <--- AJOUT
+                    # self.ecran.afficher(
+                    #     ligne1="ACCES REFUSE", 
+                    #     ligne2="Carte invalide", 
+                    #     duree=2
+                    # )
+
+                if est_autorisee and nom.lower() == "admin":
+                    question_data = self.questions_admin.get(uid_string)
+                    if question_data:
+                        print(f"[SECURITE] Question pour admin : {question_data['question']}")
+
+                # Mémorisation pour éviter les doublons..............................................................
+                        self.derniere_carte = uid_string
+                        tentatives = 3
+                        while tentatives > 0:
+                            reponse = input("Votre réponse : ").strip()
+                            if reponse.lower() == question_data['reponse'].strip().lower():
+                                print("[INFO] Réponse correcte. Accès admin autorisé.")
+                                self.interface_admin(uid_carte)
+                                break
+                            else:
+                                tentatives -= 1
+                                print(f"[ALERTE] Réponse incorrecte. Il vous reste {tentatives} tentatives.")
+                        if tentatives == 0:
+                            print("[ALERTE] Accès admin refusé définitivement.")
+
+                    else:
+                        print("[INFO] Pas de question de sécurité trouvée. Accès admin autorisé.")
+                        self.interface_admin(uid_carte)
+
+                        
+                        self.publier_info_carte(date, uid_carte)
+                        self.enregistrer(uid_carte, nom, statut)
 
                 self.derniere_carte = uid_str
                 self.dernier_temps = now

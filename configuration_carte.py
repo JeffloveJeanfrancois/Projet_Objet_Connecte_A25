@@ -1,10 +1,11 @@
 from pirc522 import RFID
+from typing import Optional, List
 
 class CarteConfiguration:
 
-    def __init__(self, rdr=None, CLE=[0xFF]*6):
+    def __init__(self, rdr: RFID | None = None, CLE=None):
         self.rdr = rdr
-        self.CLE = CLE
+        self.CLE = CLE if CLE is not None else [0xFF] * 6
 
         # ensemble de cle possible
         self.COMMON_KEYS = [
@@ -16,10 +17,10 @@ class CarteConfiguration:
             [0xB0]*6,
         ]
 
-    def est_bloc_remorque(self, numero_bloc):
+    def est_bloc_remorque(self, numero_bloc: int) -> bool:
         return (numero_bloc + 1) % 4 == 0
 
-    def authentifier(self, uid, bloc):
+    def authentifier(self, uid, bloc: int) -> bool:
         self.rdr.select_tag(uid)  
 
         # Essai clé principale
@@ -35,7 +36,7 @@ class CarteConfiguration:
         return False
 
 
-    def lire_bloc(self, uid, bloc):
+    def lire_bloc(self, uid, bloc: int) -> Optional[List[int]]:
         if self.est_bloc_remorque(bloc):
             print(f"[INFO] Bloc {bloc} est un trailer — lecture interdite.")
             return None
@@ -58,7 +59,7 @@ class CarteConfiguration:
         return data
 
 
-    def ecrire_bloc(self, uid, bloc, texte):
+    def ecrire_bloc(self, uid, bloc: int, texte: str) -> bool:
         if self.est_bloc_remorque(bloc):
             print(f"[ERREUR] Bloc trailer {bloc}, écriture interdite.")
             return False
@@ -69,7 +70,7 @@ class CarteConfiguration:
             return False
 
         # Préparer les 16 octets
-        data = list(texte.encode("utf-8")[:16])
+        data = list(texte.encode("ascii")[:16])
         data += [0] * (16 - len(data))
 
         # Écriture du bloc
@@ -91,7 +92,7 @@ class CarteConfiguration:
         return True
 
 
-    def lire_blocs(self, uid, blocs):
+    def lire_blocs(self, uid, blocs: List[int]) -> str:
         texte_total = ""
         for bloc in blocs:
             if not self.est_bloc_remorque(bloc):
