@@ -3,13 +3,13 @@ import os
 
 # --- CONFIGURATION AZURE PUBLISHER ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CERTFILE = os.path.join(BASE_DIR, "..", "certs", "client-publisher.pem")
-KEYFILE  = os.path.join(BASE_DIR, "..", "certs", "client-publisher.key")
+CERTFILE = os.path.join(BASE_DIR, "certs", "client-publisher.pem")
+KEYFILE  = os.path.join(BASE_DIR, "certs", "client-publisher.key")
 
 AZURE_BROKER = "broker-mqtt.canadaeast-1.ts.eventgrid.azure.net"
 AZURE_PORT = 8883
 AZURE_USERNAME = "client-publisher"
-AZURE_TOPIC_BASE = "LecteurRFID/log"
+AZURE_TOPIC_BASE = "LecteurRFID/logs"
 
 
 def main():

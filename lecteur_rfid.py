@@ -29,7 +29,7 @@ class LecteurRFID:
                  led_verte = 40,
                  broker = "broker-mqtt.canadaeast-1.ts.eventgrid.azure.net", 
                  port = 8883,
-                 sujet_log = "LecteurRFID/log",
+                 sujet_log = "LecteurRFID/logs",
                  fichier_cartes = "cartes_autorisees.json",
                  fichier_cartes_csv = "cartes_autorisees.csv",
                  utiliser_mqtt = True,
@@ -54,6 +54,7 @@ class LecteurRFID:
         GPIO.setup(self.led_verte, GPIO.OUT) 
         GPIO.setup(self.led_rouge, GPIO.OUT) 
         GPIO.setup(self.buzzer, GPIO.OUT)    
+        self.mqtt_client = mqtt.Client(client_id="LecteurRFID")
 
         self.ecran = AffichageQapass()
 
@@ -68,7 +69,7 @@ class LecteurRFID:
         self.nom_fichier = nom_fichier
         self.fichier_cartes = fichier_cartes
         self.fichier_cartes_csv = fichier_cartes_csv
-        self.cartes_autorisees = self._charger_cartes_autorisees()
+        #self.cartes_autorisees = self._charger_cartes_autorisees()
         self.gestion_acces = GestionAcces(self.fichier_cartes_csv)
         self.gestion_csv = GestionCartesCSV(nom_fichier=self.fichier_cartes)
         self.mifare = CarteConfiguration(rdr=self.rfid)
@@ -163,14 +164,16 @@ class LecteurRFID:
             "uid": uid_str
         })
         # Le sujet utilise le format qui fonctionne avec le template LecteurRFID/log/#
-        sujet_carte = f"{self.sujet_log}/{int(time.time())}" 
+        #sujet_carte = f"{self.sujet_log}/{int(time.time())}" 
         
         try:
             # On publie directement car loop_start() est utilisé dans __init__
-            info = self.client.publish(sujet_carte, info_carte, qos=1, retain=False)
+            #info = self.client.publish(sujet_carte, info_carte, qos=1, retain=False)
             # On utilise un timeout court pour ne pas bloquer le lecteur de carte.
+            self.client.publish(self.sujet_log, info_carte)
+            print(f"[MQTT] Message publié → {self.sujet_log} : {info_carte}")
 
-            print(f"info carte envoye sur {sujet_carte} : {info_carte}")
+            #print(f"info carte envoye sur {sujet_carte} : {info_carte}")
         except Exception as e:
             print(f"[AVERTISSEMENT] Erreur lors de la publication MQTT: {e}")
 
@@ -368,6 +371,7 @@ class LecteurRFID:
                 uid_string = "-".join(str(octet) for octet in uid_carte)
                 est_autorisee, nom, statut = self._verifier_carte(uid_string)
                 date = time.strftime("%Y-%m-%d %H:%M:%S")
+                self.publier_info_carte(date, uid_carte)
                 
                 self.afficher_carte(uid_carte)
                 print(f"Nom: {nom}")
