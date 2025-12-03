@@ -22,7 +22,7 @@ class LecteurRFID:
                  nom_fichier="journal_rfid.csv",
                  led_rouge=38,
                  led_verte=40,
-                 broker="10.4.1.193",
+                 broker="10.4.1.162",
                  port=1883,
                  sujet_log="LecteurRFID/log",
                  fichier_cartes="cartes_autorisees.csv",       
