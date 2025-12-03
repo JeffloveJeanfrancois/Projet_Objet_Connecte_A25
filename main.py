@@ -11,10 +11,9 @@ AZURE_PORT = 8883
 AZURE_USERNAME = "client-publisher"
 AZURE_TOPIC_BASE = "LecteurRFID/logs"
 
-
 def main():
     # Création du lecteur RFID
-    lecteur = RFIDController(
+    controller = RFIDController(
         broche_buzzer=33,   
         delai_lecture=2,
         
@@ -31,8 +30,7 @@ def main():
     )
 
     # Lance la détection en boucle
-    lecteur.lancer()
-
+    controller.lancer()
 
 if __name__ == "__main__":
     main()
