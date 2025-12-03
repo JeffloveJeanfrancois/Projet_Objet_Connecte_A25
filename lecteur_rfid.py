@@ -163,17 +163,19 @@ class LecteurRFID:
             "date_heure": date,
             "uid": uid_str
         })
-        # Le sujet utilise le format qui fonctionne avec le template LecteurRFID/log/#
-        #sujet_carte = f"{self.sujet_log}/{int(time.time())}" 
-        
-        try:
-            # On publie directement car loop_start() est utilisé dans __init__
-            #info = self.client.publish(sujet_carte, info_carte, qos=1, retain=False)
-            # On utilise un timeout court pour ne pas bloquer le lecteur de carte.
-            self.client.publish(self.sujet_log, info_carte)
-            print(f"[MQTT] Message publié → {self.sujet_log} : {info_carte}")
 
-            #print(f"info carte envoye sur {sujet_carte} : {info_carte}")
+        # Sujet conforme au template Azure : LecteurRFID/logs/{id}
+        sujet_carte = f"{self.sujet_log}/{int(time.time())}"
+
+        try:
+            result = self.client.publish(sujet_carte, info_carte, qos=1, retain=False)
+
+            # Vérification optionnelle
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                print(f"[MQTT] Message publié → {sujet_carte} : {info_carte}")
+            else:
+                print(f"[MQTT] Échec publication → rc={result.rc}")
+
         except Exception as e:
             print(f"[AVERTISSEMENT] Erreur lors de la publication MQTT: {e}")
 
