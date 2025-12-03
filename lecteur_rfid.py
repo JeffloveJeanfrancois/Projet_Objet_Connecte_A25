@@ -22,7 +22,7 @@ class LecteurRFID:
                  nom_fichier="journal_rfid.csv",
                  led_rouge=38,
                  led_verte=40,
-                 broker="10.4.1.193",
+                 broker="192.168.40.122",
                  port=1883,
                  sujet_log="LecteurRFID/log",
                  fichier_cartes="cartes_autorisees.csv",       
@@ -140,6 +140,14 @@ class LecteurRFID:
                 uid_str = "-".join(str(octet) for octet in uid_carte)
                 print(f"Carte détectée : {uid_str}")
 
+                # --- Vérification carte admin ---
+                if uid_str in self.questions_admin:
+                    #print("Vous n'êtes pas autorisé à configurer cette carte (carte admin).")
+                    print("\033[91mVous n'êtes pas autorisé à configurer cette carte (carte admin).\033[0m")
+
+                    continue 
+
+
                 # Vérification existence
                 existe, nom_actuel, _, _, _ = self.gestion_csv.verifier_carte(uid_str)
                 carte_trouvee = (nom_actuel != "Non renseigné")
@@ -152,13 +160,14 @@ class LecteurRFID:
                 # --- SAISIE DES DONNÉES ---
                 if carte_trouvee:
                     print(f"Carte existante : Nom = {nom_actuel}")
-                    conf = input("Écraser ? (oui/non) : ")
-                    if conf.lower() == "oui":
+                    conf = input("Écraser ? (oui/non) : ").strip().lower()
+                    if conf == "oui":
                         nouveau_nom = input("Nom : ").strip()
                         statut_actif = input("Activer ? (oui/non) : ").strip().lower() == "oui"
                         nouveaux_credits = input("Crédits : ").strip()
                     else:
-                        print("Annulé.")
+                        print("Menu de lecture/écriture")
+                        self.menu_configuration_blocs(uid_carte)
                         continue
                 else:
                     print("Nouvelle carte.")
@@ -209,33 +218,47 @@ class LecteurRFID:
                 print("Choix invalide.")
 
     def menu_configuration_blocs(self, uid_admin):
+
+        def demander_bloc(action="lire"):
+            while True:
+                bloc_str = input(f"Numéro du bloc à {action} (0 à 5) : ").strip()
+                
+                if not bloc_str.isdigit():
+                    print("Saisie incorrecte : veuillez entrer un numéro entre 0 et 5.")
+                    continue
+                else:
+                    bloc = int(bloc_str)
+                    if bloc < 0 or bloc > 5:
+                        print("Bloc invalide : valeur hors limites.")
+                        print("Veuillez entrer un numéro entre 0 et 5.")
+                        continue
+                    else:
+                        print(f"Bloc valide : {bloc}")
+
+                if self.mifare.est_bloc_remorque(bloc):
+                    print("Lecture bloc remorque impossible")
+                    continue
+
+                return bloc
         while True:
             print("\n--- Menu Bloc ---")
             print("1. Lire un bloc")
             print("2. Écrire un bloc")
             print("3. Quitter le menu bloc")
-            choix = input("Votre choix : ")
+            choix = input("Votre choix : ").strip()
             
             if choix == "1":
-                bloc = int(input("Numéro du bloc à lire : "))
-                if self.mifare.est_bloc_remorque(bloc):
-                    print("Lecture bloc remorque impossible")
-                    continue
-                
-                # Ajout du message ici
+                bloc = demander_bloc("lire")
                 uid_carte = self.attendre_carte("Approchez la carte à lire...")
                 
                 contenu = self.mifare.lire_bloc(uid_carte, bloc)
-                if contenu: print(f"Contenu : {contenu}")
+                if contenu: 
+                    print(f"Contenu : {contenu}")
 
             elif choix == "2":
-                bloc = int(input("Numéro du bloc à écrire : "))
-                if self.mifare.est_bloc_remorque(bloc):
-                    print("Écriture bloc remorque interdite")
-                    continue
+                bloc = demander_bloc("écrire")
+
                 texte = input("Texte : ")
-                
-                # Ajout du message ici
                 uid_carte = self.attendre_carte("Approchez la carte pour écrire...")
                 
                 self.mifare.ecrire_bloc(uid_carte, bloc, texte)
@@ -274,10 +297,12 @@ class LecteurRFID:
         except: return {}
 
     def lancer(self):
-        print("En attente d’une carte...")
-        if self.ecran: self.ecran.accueil()
+        
         try:
             while True:
+                print("En attente d’une carte...")
+                if self.ecran: self.ecran.accueil()
+
                 # Ici on garde le message par défaut ou on met None si on veut silence
                 uid_carte = self.attendre_carte(message=None) 
                 
@@ -290,9 +315,17 @@ class LecteurRFID:
                 print(f"Nom: {nom}")
                 print(f"Statut: {statut}")
                 
-                if self.derniere_carte == uid_string and (temps_actuel - self.dernier_temps) < self.delai_lecture:
-                    time.sleep(0.5)
-                    continue
+                temps_ecoule = temps_actuel - self.dernier_temps
+                if uid_string == self.derniere_carte:
+                    if temps_ecoule < 5:   
+                        print("Carte déjà lue et débitée. Attendre 5 secondes pour une nouvelle lecture.")
+                        time.sleep(0.5)
+                        continue
+                else:
+                    if temps_ecoule < self.delai_lecture:
+                        time.sleep(0.2)
+                        continue
+
 
                 print("\n===== Carte détectée =====")
                 print("UID :", uid_carte)
@@ -305,24 +338,33 @@ class LecteurRFID:
 
                 if est_autorisee and nom.lower() == "admin":
                     question_data = self.questions_admin.get(uid_string)
+
+                    admin_ok = False
+
                     if question_data:
                         print(f"[SECURITE] Question : {question_data['question']}")
                         self.derniere_carte = uid_string
                         tentatives = 3
+                        
                         while tentatives > 0:
                             reponse = input("Réponse : ").strip()
                             if reponse.lower() == question_data['reponse'].strip().lower():
                                 print("Accès admin autorisé.")
-                                self.interface_admin(uid_carte)
+                                admin_ok = True
+                                #self.interface_admin(uid_carte)
                                 break
                             else:
                                 tentatives -= 1
-                                print(f"Incorrect. Restantes: {tentatives}.")
+                                print(f"Réponse incorrecte. Essais restants: {tentatives}.")
                     else:
+                        admin_ok = True
+                    
+                    if admin_ok:
                         print("Accès admin autorisé.")
                         self.interface_admin(uid_carte)
                         self.publier_info_carte(date, uid_carte)
                         self.enregistrer(uid_carte, nom, statut)
+                        continue
 
                 self.derniere_carte = uid_string
                 self.dernier_temps = temps_actuel
