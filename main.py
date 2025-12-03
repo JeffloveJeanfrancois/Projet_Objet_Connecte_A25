@@ -1,4 +1,4 @@
-from RFIDController import RFIDController
+from RFID_controller import RFIDController
 import os
 
 # --- CONFIGURATION AZURE PUBLISHER ---

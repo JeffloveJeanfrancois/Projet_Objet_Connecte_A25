@@ -2,7 +2,7 @@
 
 # Script de test pour le lecteur RFID sans MQTT.
 
-from RFIDController import RFIDController
+from RFID_controller import RFIDController
 
 
 def main():
