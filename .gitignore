@@ -216,4 +216,4 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Fichiers de données locales (RFID)
-cartes_autorisees.csv
+#cartes_autorisees.csv
