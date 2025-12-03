@@ -1,7 +1,7 @@
-# Fichier: gestion_acces.py
-
 import time
 import RPi.GPIO as GPIO
+import threading
+
 
 class GestionAcces:
 
@@ -25,27 +25,40 @@ class GestionAcces:
 
     # ---------- Scénarios utilisateur ----------
     def carte_acceptee(self, nom=""):
-        # Affichage du message dans la console (géré par verification.py)
+    # Lancer LED + bip simultanément
+        thread_led = threading.Thread(target=self._allumer_led, args=(self.led_verte, 2))
+        thread_bip = threading.Thread(target=self._bip, args=(0.2,))
 
-        self._allumer_led(self.led_verte, 2)   # LED verte 2s
-        self._bip(0.2)                         # Bip court 0.2s
-        
-        if self.ecran: # <--- GESTION DE L'AFFICHAGE (maintenant ici)
+        thread_led.start()
+        thread_bip.start()
+
+        # Attendre la fin des threads AVANT d'afficher
+        thread_led.join()
+        thread_bip.join()
+
+        # Affichage sur l'écran
+        if self.ecran:
             self.ecran.afficher(
-                ligne1="ACCES ACCEPTE", 
-                ligne2=f"Bienvenue {nom}"[:16], # Affiche les 16 premiers caractères
+                ligne1="ACCES ACCEPTE",
+                ligne2=f"Bienvenue {nom}"[:16],
                 duree=4
             )
 
+
+
     def carte_refusee(self):
-        # Affichage du message dans la console (géré par verification.py)
-        
-        self._allumer_led(self.led_rouge, 2)   # LED rouge 2s
-        self._bip(0.8)                         # Bip long 0.8s
-        
-        if self.ecran: # <--- GESTION DE L'AFFICHAGE (maintenant ici)
+        thread_led = threading.Thread(target=self._allumer_led, args=(self.led_rouge, 2))
+        thread_bip = threading.Thread(target=self._bip, args=(0.8,))
+
+        thread_led.start()
+        thread_bip.start()
+
+        thread_led.join()
+        thread_bip.join()
+
+        if self.ecran:
             self.ecran.afficher(
-                ligne1="ACCES REFUSE", 
-                ligne2="Carte Invalide", 
+                ligne1="ACCES REFUSE",
+                ligne2="Carte Invalide",
                 duree=4
             )

@@ -30,7 +30,7 @@ class LecteurRFID:
                  ):
 
         # Configuration GPIO
-        GPIO.setwarnings(False)     
+        GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BOARD)
         GPIO.setwarnings(False)
         GPIO.setup(broche_buzzer, GPIO.OUT)
