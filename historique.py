@@ -7,7 +7,7 @@ from typing import List, Dict, Optional
 class HistoriqueDesAcces:
     def __init__(self):
         self.fichier_historique = "journal_rfid.csv"
-        self.fichier_cartes = "cartes_autorisees.json"
+        self.fichier_cartes = "cartes_autorisees.csv"
         self.cartes_autorisees = self._charger_cartes_autorisees()
         self.entrees_historique = self._charger_historique()
     

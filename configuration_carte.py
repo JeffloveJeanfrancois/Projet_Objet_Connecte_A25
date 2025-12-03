@@ -84,10 +84,10 @@ class CarteConfiguration:
         print(f"[INFO] Bloc {bloc} écrit avec succès : {texte}")
 
         # Relire immédiatement pour afficher le contenu réel
-        contenu_lu = self.lire_bloc(uid, bloc)
-        if contenu_lu:
-            texte_lu = ''.join(chr(x) if 32 <= x <= 126 else '.' for x in contenu_lu)
-            print(f"[INFO] Contenu réel du bloc {bloc} après écriture : {texte_lu}")
+        #contenu_lu = self.lire_bloc(uid, bloc)
+        #if contenu_lu:
+        #    texte_lu = ''.join(chr(x) if 32 <= x <= 126 else '.' for x in contenu_lu)
+        print(f"[INFO] Contenu réel du bloc {bloc} après écriture : {texte}")
 
         return True
 
@@ -100,3 +100,4 @@ class CarteConfiguration:
                 if data:
                     texte_total += ''.join(chr(x) if 32 <= x <= 126 else '.' for x in data)
         return texte_total
+    

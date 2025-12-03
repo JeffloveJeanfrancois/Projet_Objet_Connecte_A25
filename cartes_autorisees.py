@@ -1,7 +1,7 @@
 import csv
 import os
 
-class GestionAcces:
+class GestionCartesCSV:
     def __init__(self, nom_fichier="cartes_autorisees.csv"):
         self.nom_fichier = nom_fichier
         self.colonnes_officielles = ["UID", "Nom", "Actif", "Credits", "Id"]
@@ -10,26 +10,16 @@ class GestionAcces:
     def creer_fichier_si_absent(self):
         if not os.path.exists(self.nom_fichier) or os.path.getsize(self.nom_fichier) == 0:
             print(f"Initialisation du fichier {self.nom_fichier}...")
-            # Données de base
-            donnees_initiales = [
-                {"UID": "111-111-111-111-111", "Nom": "Yan LeKerreq", "Actif": "True", "Credits": "0", "Id": "1"},
-                {"UID": "111-111-111-111-113", "Nom": "Michel Sansfaçon", "Actif": "False", "Credits": "0", "Id": "2"},
-                {"UID": "250-152-169-174-101", "Nom": "Admin", "Actif": "True", "Credits": "999", "Id": "0"}
-            ]
             try:
-                with open(self.nom_fichier, 'w', newline='', encoding='utf-8') as f:
-                    writer = csv.DictWriter(f, fieldnames=self.colonnes_officielles)
+                with open(self.nom_fichier, 'w', newline='', encoding='utf-8') as fichier:
+                    writer = csv.DictWriter(fichier, fieldnames=self.colonnes_officielles)
                     writer.writeheader()
-                    writer.writerows(donnees_initiales)
                 print(f"Fichier {self.nom_fichier} généré avec succès.")
             except Exception as e:
                 print(f"[ERREUR CRITIQUE] Impossible de créer le fichier CSV : {e}")
 
     def verifier_carte(self, uid):
         try:
-            if not os.path.exists(self.nom_fichier):
-                self.creer_fichier_si_absent()
-
             with open(self.nom_fichier, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for ligne in reader:
@@ -45,9 +35,6 @@ class GestionAcces:
             return False, "Erreur", f"Erreur lecture: {e}", "0", ""
 
     def ajouter_ou_modifier_carte(self, uid, nom, actif, credits):
-        """
-        Renvoie maintenant (True, id_final) si succès, ou (False, None) si échec.
-        """
         lignes = []
         max_id = 0
         trouve = False
