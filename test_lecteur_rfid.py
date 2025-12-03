@@ -2,7 +2,7 @@
 
 # Script de test pour le lecteur RFID sans MQTT.
 
-from lecteur_rfid import LecteurRFID
+from RFIDController import RFIDController
 
 
 def main():
@@ -13,7 +13,7 @@ def main():
     print("Les cartes seront detectees et enregistrees dans le journal CSV.")
     
     # Creation du lecteur RFID sans MQTT
-    lecteur = LecteurRFID(
+    lecteur = RFIDController(
         broche_buzzer=33,   
         delai_lecture=2,
         nom_fichier="journal_rfid.csv",

@@ -1,4 +1,4 @@
-from lecteur_rfid import LecteurRFID
+from RFIDController import RFIDController
 import os
 
 # --- CONFIGURATION AZURE PUBLISHER ---
@@ -14,7 +14,7 @@ AZURE_TOPIC_BASE = "LecteurRFID/logs"
 
 def main():
     # Création du lecteur RFID
-    lecteur = LecteurRFID(
+    lecteur = RFIDController(
         broche_buzzer=33,   
         delai_lecture=2,
         

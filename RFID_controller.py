@@ -15,7 +15,7 @@ from admin_interface import AdminInterface
 from feedback import FeedbackGPIO
 
 
-class LecteurRFID:
+class RFIDController:
     def __init__(
         self,
         broche_buzzer=33,
