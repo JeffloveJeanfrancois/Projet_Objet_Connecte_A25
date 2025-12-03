@@ -7,6 +7,11 @@ import os
 import json
 import sys
 from typing import Dict
+from carte_autorise import GestionAcces
+
+from card_reader import CardReader
+from configuration_carte import CarteConfiguration
+import ssl
 
 from gestion_acces import GestionAcces           
 from verification import identifier_carte        
@@ -16,18 +21,22 @@ from cartes_autorisees import GestionCartesCSV
 
 class LecteurRFID:
 
-    def __init__(self,
-                 broche_buzzer=33,
-                 delai_lecture=2,
-                 nom_fichier="journal_rfid.csv",
-                 led_rouge=38,
-                 led_verte=40,
-                 broker="10.4.1.193",
-                 port=1883,
-                 sujet_log="LecteurRFID/log",
-                 fichier_cartes="cartes_autorisees.csv",       
-                 utiliser_mqtt = True
-                 ):
+    def __init__(self, 
+                 broche_buzzer=33, 
+                 delai_lecture=2, 
+                 nom_fichier = "journal_rfid.csv",
+                 led_rouge = 38,
+                 led_verte = 40,
+                 broker = "broker-mqtt.canadaeast-1.ts.eventgrid.azure.net", 
+                 port = 8883,
+                 sujet_log = "LecteurRFID/log",
+                 fichier_cartes = "cartes_autorisees.json",
+                 fichier_cartes_csv = "cartes_autorisees.csv",
+                 utiliser_mqtt = True,
+                 mqtt_username = None,
+                 mqtt_certfile = None,
+                 mqtt_keyfile = None
+              ):
 
         # Configuration GPIO
         GPIO.setwarnings(False)     
@@ -58,6 +67,9 @@ class LecteurRFID:
         self.delai_lecture = delai_lecture
         self.nom_fichier = nom_fichier
         self.fichier_cartes = fichier_cartes
+        self.fichier_cartes_csv = fichier_cartes_csv
+        self.cartes_autorisees = self._charger_cartes_autorisees()
+        self.gestion_acces = GestionAcces(self.fichier_cartes_csv)
         self.gestion_csv = GestionCartesCSV(nom_fichier=self.fichier_cartes)
         self.mifare = CarteConfiguration(rdr=self.rfid)
         self.questions_admin = self._charger_questions_admin("pass.json")
@@ -67,19 +79,55 @@ class LecteurRFID:
         self.broker = broker
         self.port = port
         self.sujet_log = sujet_log
-
-        self.client = mqtt.Client()
-        try:
-            self.client.connect(self.broker, self.port, 60)
-        except:
-            print("Erreur connexion MQTT")
-
+        self.utiliser_mqtt = utiliser_mqtt
+        
+        # Mémorisation des paramètres mTLS
+        self.mqtt_username = mqtt_username
+        self.mqtt_certfile = mqtt_certfile
+        self.mqtt_keyfile = mqtt_keyfile
+        
+        # Création du fichier CSV s'il n'existe pas encore
         if not os.path.exists(nom_fichier):
             with open(nom_fichier, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
                 writer.writerow(["Date/Heure", "UID", "Nom", "Statut"])
+        
+        if self.utiliser_mqtt:
+            # Spécifier le protocole v3.1.1 et créer le client
+            self.client = mqtt.Client(protocol=mqtt.MQTTv311)
+            
+            # --- IMPLÉMENTATION mTLS AZURE ---
+            if self.port == 8883 and self.mqtt_certfile and self.mqtt_keyfile:
+                # Configuration SSL/TLS
+                self.client.tls_set(
+                    ca_certs=None, # Utilise les CAs système pour Azure
+                    certfile=self.mqtt_certfile,
+                    keyfile=self.mqtt_keyfile,
+                    cert_reqs=ssl.CERT_REQUIRED,
+                    tls_version=ssl.PROTOCOL_TLSv1_2
+                )
+                # Configuration du nom d'utilisateur (requis par Azure)
+                self.client.username_pw_set(username=self.mqtt_username, password=None) 
+                self.client.on_connect = self._on_connect 
+
+            try:
+                # Connexion et démarrage de la boucle en arrière-plan
+                self.client.connect(self.broker, self.port, 60)
+                self.client.loop_start() 
+            except Exception as e:
+                print(f"[ERREUR FATALE] Impossible de se connecter au broker MQTT: {e}")
+                # Le script peut continuer mais ne publiera pas
+                self.utiliser_mqtt = False 
+        
+        # ... (Création du fichier CSV s'il n'existe pas encore) ...
 
         print("Lecteur RFID prêt. Approchez une carte !")
+        
+    def _on_connect(self, client, userdata, flags, rc):
+        if rc == 0:
+            print(f"[MQTT] Connexion réussie à {self.broker}")
+        else:
+            print(f"[MQTT] Échec de la connexion (RC={rc})")
 
     def bip(self, duree=0.3):
         GPIO.output(self.buzzer, True)
@@ -106,13 +154,23 @@ class LecteurRFID:
             writer.writerow([date, uid_str, nom, statut])
 
     def publier_info_carte(self, date, uid):
+        if not self.utiliser_mqtt:
+            return
+
         uid_str = "-".join(str(octet) for octet in uid)
-        info_carte = json.dumps({"date_heure": date, "uid": uid_str})
-        sujet_carte = f"{self.sujet_log}/{int(time.time())}"
+        info_carte = json.dumps({
+            "date_heure": date,
+            "uid": uid_str
+        })
+        # Le sujet utilise le format qui fonctionne avec le template LecteurRFID/log/#
+        sujet_carte = f"{self.sujet_log}/{int(time.time())}" 
+        
         try:
-            self.client.publish(sujet_carte, info_carte, qos=1, retain=False)
-            self.client.loop()
-            print(f"info carte envoye sur {self.sujet_log} : {info_carte}")
+            # On publie directement car loop_start() est utilisé dans __init__
+            info = self.client.publish(sujet_carte, info_carte, qos=1, retain=False)
+            # On utilise un timeout court pour ne pas bloquer le lecteur de carte.
+
+            print(f"info carte envoye sur {sujet_carte} : {info_carte}")
         except Exception as e:
             print(f"[AVERTISSEMENT] Erreur lors de la publication MQTT: {e}")
 
@@ -329,4 +387,10 @@ class LecteurRFID:
         finally:
             GPIO.cleanup()
             self.rfid.cleanup()
+            
+            # --- DÉCONNEXION PROPRE DU BROKER AZURE ---
+            if self.utiliser_mqtt:
+                self.client.loop_stop()
+                self.client.disconnect()
+            
             print(" Nettoyage terminé.")
