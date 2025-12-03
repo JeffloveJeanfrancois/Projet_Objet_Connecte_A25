@@ -1,0 +1,10 @@
+Lancez le test_subscribe_azure.py en premier dans un terminal.
+Lancez ensuite test_publish_azure.py dans un autre terminal.
+
+test_publish_azure.py devrait publier dans LecteurRFID/log/test avec succès.
+test_subscribe_azure.py devrait chercher le message dans le topic LecteurRFID/log/test
+
+COMMANDES À LANCER DANS 2 TERMINAUX DIFFÉRENTS:
+cd Tests_Azure
+python test_subscribe_azure.py
+python test_publish_azure.py

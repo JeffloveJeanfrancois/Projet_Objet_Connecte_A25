@@ -100,3 +100,4 @@ class CarteConfiguration:
                 if data:
                     texte_total += ''.join(chr(x) if 32 <= x <= 126 else '.' for x in data)
         return texte_total
+    
