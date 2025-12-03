@@ -17,7 +17,7 @@ from gestion_acces import GestionAcces
 from verification import identifier_carte        
 from affichage_qapass import AffichageQapass
 from configuration_carte import CarteConfiguration
-from cartes_autorisees import GestionAcces as GestionCartesCSV
+from cartes_autorisees import GestionCartesCSV
 
 class LecteurRFID:
 
