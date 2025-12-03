@@ -1,5 +1,4 @@
 from pirc522 import RFID
-import RPi.GPIO as GPIO
 import time
 import os
 import json
@@ -13,6 +12,7 @@ from cartes_autorisees import GestionCartesCSV
 from journal_rfid import JournalRFID
 from mqtt_publisher import MqttPublisher
 from admin_interface import AdminInterface
+from feedback import FeedbackGPIO
 
 
 class LecteurRFID:
@@ -32,30 +32,16 @@ class LecteurRFID:
         mqtt_certfile=None,
         mqtt_keyfile=None,
     ):
-        GPIO.setwarnings(False)
-        GPIO.setmode(GPIO.BOARD)
-        GPIO.setwarnings(False)
-        GPIO.setup(broche_buzzer, GPIO.OUT)
-        GPIO.setup(led_rouge, GPIO.OUT)
-        GPIO.setup(led_verte, GPIO.OUT)
-
         self.rfid = RFID(pin_irq=None)
-        self.buzzer = broche_buzzer
-        self.led_rouge = led_rouge
-        self.led_verte = led_verte
-
-        GPIO.setup(self.led_verte, GPIO.OUT)
-        GPIO.setup(self.led_rouge, GPIO.OUT)
-        GPIO.setup(self.buzzer, GPIO.OUT)
+        self.feedback = FeedbackGPIO(
+            led_verte=led_verte,
+            led_rouge=led_rouge,
+            buzzer=broche_buzzer
+        )
 
         self.ecran = AffichageQapass()
 
-        self.acces = GestionAcces(
-            led_verte=self.led_verte,
-            led_rouge=self.led_rouge,
-            buzzer=self.buzzer,
-            ecran=self.ecran,
-        )
+        self.acces = GestionAcces(feedback=self.feedback, ecran=self.ecran)
 
         self.delai_lecture = delai_lecture
         self.nom_fichier = nom_fichier
@@ -92,11 +78,6 @@ class LecteurRFID:
         )
 
         print("Lecteur RFID pret. Approchez une carte !")
-
-    def bip(self, duree=0.3):
-        GPIO.output(self.buzzer, True)
-        time.sleep(duree)
-        GPIO.output(self.buzzer, False)
 
     def afficher_carte(self, uid):
         print("\n####### Nouvelle carte detectee #######")
@@ -192,7 +173,7 @@ class LecteurRFID:
                 self.derniere_carte = uid_string
                 self.dernier_temps = temps_actuel
         finally:
-            GPIO.cleanup()
+            self.feedback.cleanup()
             self.rfid.cleanup()
 
             self.mqtt_publisher.close()
