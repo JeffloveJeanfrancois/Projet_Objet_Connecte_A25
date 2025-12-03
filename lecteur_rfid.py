@@ -53,8 +53,7 @@ class LecteurRFID:
 
         GPIO.setup(self.led_verte, GPIO.OUT) 
         GPIO.setup(self.led_rouge, GPIO.OUT) 
-        GPIO.setup(self.buzzer, GPIO.OUT)    
-        self.mqtt_client = mqtt.Client(client_id="LecteurRFID")
+        GPIO.setup(self.buzzer, GPIO.OUT)
 
         self.ecran = AffichageQapass()
 
