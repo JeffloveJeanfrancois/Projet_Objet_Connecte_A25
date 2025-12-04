@@ -47,11 +47,11 @@ class LecteurRFID:
         - Retourne True si une erreur s'est produite, False sinon.
         """
         if self.est_bloc_remorque(block):
-            print(f"[ERREUR] Bloc trailer {block}, écriture interdite.")
+            print(f"[ERREUR] Bloc trailer {block}, ecriture interdite.")
             return True
  
         if not self.authentifier(uid, block):
-            print(f"[ERREUR] Auth échouée bloc {block}")
+            print(f"[ERREUR] Auth echouee pour le bloc {block}")
             return True
 
         data = string_to_block_list(text)
@@ -60,7 +60,7 @@ class LecteurRFID:
         self.rdr.stop_crypto()
 
         if error:
-            print(f"[ERREUR] Écriture échouée bloc {block}")
+            print(f"[ERREUR] Ecriture echouee bloc {block}")
             return True
 
         return False
@@ -78,7 +78,7 @@ class LecteurRFID:
             return True, []
 
         if not self.authentifier(uid, block):
-            print(f"[ERREUR] Auth échouée bloc {block}")
+            print(f"[ERREUR] Auth echouee pour le bloc {block}")
             return True, []
 
         error, data = self.rdr.read(block)
@@ -108,7 +108,7 @@ class LecteurRFID:
             error, data = self.lire_bloc(uid, block)
 
             if error:
-                print(f"[AVERTISSEMENT] Lecture du bloc {block} échouée, bloc ignoré.")
+                print(f"[AVERTISSEMENT] Lecture du bloc {block} a echouee, bloc ignore.")
                 continue
 
             text = block_list_to_string(data)

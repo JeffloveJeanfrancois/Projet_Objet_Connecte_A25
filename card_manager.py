@@ -7,7 +7,7 @@ class CardError(Exception):
     pass
 
 class ReadError(CardError):
-    def __init__(self, uid, message="Impossible de lire la carte"):
+    def __init__(self, uid, message="Impossible de lire la carte correctement"):
         super().__init__(f"{message} (UID: {uid})")
         self.uid = uid
 
@@ -25,38 +25,39 @@ class InsufficientCounter(CardError):
 
 
 class CardService:
-    BLOCK_ID = 4
-    BLOCK_COUNTER = 5
+    ID_BLOCK = 4
+    COUNTER_BLOCK = 5
     MAX_COUNTER = 999
+    BLOCK_SIZE = 16
 
     def __init__(self, reader: LecteurRFID):
         self.reader = reader
 
     # ---- ID ----
-    def read_card_id(self, uid):
-        data = self.reader.lire_bloc(uid, self.BLOCK_ID)
-        if not data:
+    def read_card_id(self, uid) -> str:
+        error, data = self.reader.lire_bloc(uid, self.ID_BLOCK)
+        if error or data is None or len(data) != self.BLOCK_SIZE:
             raise ReadError(uid)
         return block_list_to_string(data)
 
-    def write_card_id(self, uid, card_id: str):
-        success = self.reader.ecrire_bloc(uid, self.BLOCK_ID, card_id)
-        if not success:
+    def write_card_id(self, uid, card_id: str) -> bool:
+        error = self.reader.ecrire_bloc(uid, self.ID_BLOCK, card_id)
+        if error:
             raise WriteError(uid)
-        return success
+        return error
 
     # ---- COUNTER ----
-    def read_counter(self, uid):
-        data = self.reader.lire_bloc(uid, self.BLOCK_COUNTER)
-        if not data:
-            raise ReadError(uid, "Impossible de lire le compteur")
+    def read_counter(self, uid) -> int:
+        error, data = self.reader.lire_bloc(uid, self.COUNTER_BLOCK)
+        if error or data is None or len(data) != self.BLOCK_SIZE:
+            raise ReadError(uid, "Impossible de lire le compteur correctement")
         return block_list_to_integer(data)
 
-    def write_counter(self, uid, value: int):
-        success = self.reader.ecrire_bloc(uid, self.BLOCK_COUNTER, str(value))
-        if not success:
+    def write_counter(self, uid, value: int) -> bool:
+        error = self.reader.ecrire_bloc(uid, self.COUNTER_BLOCK, str(value))
+        if error:
             raise WriteError(uid, "Impossible de modifier le compteur")
-        return success
+        return error
 
     def decrement(self, uid, amount=1):
         if amount < 0:
@@ -68,8 +69,9 @@ class CardService:
             print(f"Impossible de reduire le compteur: demande {amount}, disponible {count} (UID: {uid})")
             return False, count
         else:
-            success = self.write_counter(uid, count - amount)
-            return success, amount
+            new_count = count - amount
+            error = self.write_counter(uid, new_count)
+            return new_count
 
     def increment(self, uid, amount=1):
         if amount < 0:
@@ -81,5 +83,7 @@ class CardService:
         if new_value >= self.MAX_COUNTER:
             new_value = self.MAX_COUNTER
             print(f"Compteur max atteint pour UID {uid}")
-            
-        return self.write_counter(uid, new_value)
+        
+        error = self.write_counter(uid, new_value)
+        
+        return new_value
