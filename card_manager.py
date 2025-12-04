@@ -1,4 +1,5 @@
 from rfid_lecteur import LecteurRFID
+from card_utils import block_list_to_string, block_list_to_integer
 
 # ---- Custom exceptions ----
 class CardError(Exception):
@@ -36,7 +37,7 @@ class CardService:
         data = self.reader.lire_bloc(uid, self.BLOCK_ID)
         if not data:
             raise ReadError(uid)
-        return block_list_to_str(data)
+        return block_list_to_string(data)
 
     def write_card_id(self, uid, card_id: str):
         success = self.reader.ecrire_bloc(uid, self.BLOCK_ID, card_id)
@@ -49,7 +50,7 @@ class CardService:
         data = self.reader.lire_bloc(uid, self.BLOCK_COUNTER)
         if not data:
             raise ReadError(uid, "Impossible de lire le compteur")
-        return block_list_to_int(data)
+        return block_list_to_integer(data)
 
     def write_counter(self, uid, value: int):
         success = self.reader.ecrire_bloc(uid, self.BLOCK_COUNTER, str(value))
