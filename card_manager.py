@@ -1,5 +1,5 @@
 from rfid_lecteur import LecteurRFID
-from card_utils import block_list_to_string, block_list_to_integer
+from card_utils import block_list_to_string, block_list_to_integer, string_to_block_list, integer_to_block_list
 from card_exceptions import ReadError, WriteError
 
 class CardService:
@@ -18,7 +18,7 @@ class CardService:
         self.reader = reader
 
     # ---- ID ----
-    def read_card_id(self, uid) -> str:
+    def read_card_id(self, uid: list[int]) -> str:
         """Read the card ID from the RFID card.
         Args:
             uid: UID of the card.
@@ -32,7 +32,7 @@ class CardService:
             raise ReadError(uid)
         return block_list_to_string(data)
 
-    def write_card_id(self, uid, card_id: str) -> None:
+    def write_card_id(self, uid: list[int], card_id: str) -> None:
         """Write the card ID to the RFID card.
         Args:
             uid: UID of the card.
@@ -40,12 +40,13 @@ class CardService:
         Raises:
             WriteError: If writing the block fails.
         """
-        error = self.reader.ecrire_bloc(uid, self.ID_BLOCK, card_id)
+        block_data = string_to_block_list(card_id)
+        error = self.reader.ecrire_bloc(uid, self.ID_BLOCK, block_data)
         if error:
             raise WriteError(uid)
 
     # ---- COUNTER ----
-    def read_counter(self, uid) -> int:
+    def read_counter(self, uid: list[int]) -> int:
         """Read the counter value from the RFID card.
         Args:
             uid: UID of the card.
@@ -59,7 +60,7 @@ class CardService:
             raise ReadError(uid, "Impossible de lire le compteur correctement")
         return block_list_to_integer(data)
 
-    def write_counter(self, uid, value: int) -> None:
+    def write_counter(self, uid: list[int], value: int) -> None:
         """Write a new counter value to the RFID card.
         Args:
             uid: UID of the card.
@@ -67,11 +68,12 @@ class CardService:
         Raises:
             WriteError: If writing the block fails.
         """
-        error = self.reader.ecrire_bloc(uid, self.COUNTER_BLOCK, str(value))
+        block_data = integer_to_block_list(value)
+        error = self.reader.ecrire_bloc(uid, self.COUNTER_BLOCK, block_data)
         if error:
             raise WriteError(uid, "Impossible de modifier le compteur")
 
-    def decrement(self, uid, amount=1) -> tuple[bool, int]:
+    def decrement(self, uid: list[int], amount=1) -> tuple[bool, int]:
         """Decrement the counter on the RFID card.
         Args:
             uid: UID of the card.
@@ -86,17 +88,17 @@ class CardService:
         if amount < 0:
             raise ValueError("Le montant ne peut pas etre negatif")
         
-        count = self.read_counter(uid)
+        current_count = self.read_counter(uid)
         
-        if amount > count:
-            print(f"Impossible de reduire le compteur: demande {amount}, disponible {count} (UID: {uid})")
-            return False, count
-        else:
-            new_count = count - amount
-            self.write_counter(uid, new_count)
-            return True, new_count
+        if amount > current_count:
+            print(f"Impossible de reduire le compteur: demande {amount}, disponible {current_count} (UID: {uid})")
+            return False, current_count
+        
+        new_count = current_count - amount
+        self.write_counter(uid, new_count)
+        return True, new_count
 
-    def increment(self, uid, amount=1) -> int:
+    def increment(self, uid: list[int], amount=1) -> int:
         """Increment the counter on the RFID card.
         Args:
             uid: UID of the card.
@@ -110,8 +112,8 @@ class CardService:
         if amount < 0:
             raise ValueError("Le montant ne peut pas etre negatif")
         
-        count = self.read_counter(uid)
-        new_value = count + amount
+        current_count = self.read_counter(uid)
+        new_value = current_count + amount
         
         if new_value >= self.MAX_COUNTER:
             new_value = self.MAX_COUNTER

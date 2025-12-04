@@ -81,12 +81,12 @@ class RFIDController:
 
         print("Lecteur RFID pret. Approchez une carte !")
 
-    def afficher_carte(self, uid):
+    def afficher_carte(self, uid: list[int]):
         print("\n####### Nouvelle carte detectee #######")
         print(f"UID  : {uid}")
         print("****************************************")
 
-    def _verifier_carte(self, uid):
+    def _verifier_carte(self, uid: list[int]):
         est_autorisee, nom, message, _, _ = self.gestion_csv.verifier_carte(uid)
         if est_autorisee:
             return True, nom, "Accepte"
@@ -124,7 +124,7 @@ class RFIDController:
         except Exception:
             return {}
 
-    def simulateActionCost(self, card_uid, credit_cost: int = 1):
+    def simulateActionCost(self, card_uid: list[int], credit_cost: int = 1):
         print(f"Decrementation de {credit_cost} credit(s)…")
         success, remaining = self.card_service.decrement(card_uid, credit_cost)
     
