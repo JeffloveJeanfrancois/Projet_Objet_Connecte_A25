@@ -40,11 +40,10 @@ class CardService:
             raise ReadError(uid)
         return block_list_to_string(data)
 
-    def write_card_id(self, uid, card_id: str) -> bool:
+    def write_card_id(self, uid, card_id: str) -> None:
         error = self.reader.ecrire_bloc(uid, self.ID_BLOCK, card_id)
         if error:
             raise WriteError(uid)
-        return error
 
     # ---- COUNTER ----
     def read_counter(self, uid) -> int:
@@ -53,13 +52,12 @@ class CardService:
             raise ReadError(uid, "Impossible de lire le compteur correctement")
         return block_list_to_integer(data)
 
-    def write_counter(self, uid, value: int) -> bool:
+    def write_counter(self, uid, value: int) -> None:
         error = self.reader.ecrire_bloc(uid, self.COUNTER_BLOCK, str(value))
         if error:
             raise WriteError(uid, "Impossible de modifier le compteur")
-        return error
 
-    def decrement(self, uid, amount=1):
+    def decrement(self, uid, amount=1) -> tuple[bool, int]:
         if amount < 0:
             raise ValueError("Le montant ne peut pas etre negatif")
         
@@ -70,10 +68,10 @@ class CardService:
             return False, count
         else:
             new_count = count - amount
-            error = self.write_counter(uid, new_count)
-            return new_count
+            self.write_counter(uid, new_count)
+            return True, new_count
 
-    def increment(self, uid, amount=1):
+    def increment(self, uid, amount=1) -> int:
         if amount < 0:
             raise ValueError("Le montant ne peut pas etre negatif")
         
@@ -84,6 +82,6 @@ class CardService:
             new_value = self.MAX_COUNTER
             print(f"Compteur max atteint pour UID {uid}")
         
-        error = self.write_counter(uid, new_value)
+        self.write_counter(uid, new_value)
         
         return new_value
