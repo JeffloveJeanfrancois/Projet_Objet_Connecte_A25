@@ -40,9 +40,7 @@ class LecteurRFID:
         """
         Écrit une chaîne de caractères ASCII dans un bloc spécifique de la carte RFID.
 
-        - Seuls 16 octets sont écrits; le texte est tronqué ou complété avec des zéros si nécessaire.
         - Les blocs trailer sont interdits.
-        - Les caractères non-ASCII sont remplacés par '?'.
         - Retourne True si une erreur s'est produite, False sinon.
         """
         if self.est_bloc_remorque(block):
