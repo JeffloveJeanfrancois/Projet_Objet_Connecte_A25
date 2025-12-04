@@ -130,9 +130,11 @@ class CardService:
         count = self.read_counter(uid)
         
         if amount > count:
-            raise InsufficientCounter(uid, amount, count)
-        
-        return self.write_counter(uid, count - amount)
+            print(f"Impossible de reduire le compteur: demande {amount}, disponible {count} (UID: {uid})")
+            return False, count
+        else:
+            success = self.write_counter(uid, count - amount)
+            return success, amount
 
     def increment(self, uid, amount=1):
         if amount < 0:
