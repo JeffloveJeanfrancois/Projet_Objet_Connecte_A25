@@ -32,6 +32,7 @@ class GestionCartesCSV:
         return donnees
 
     def _sauvegarder_donnees(self, lignes):
+        #ecrase le fichier CSV avec la nouvelle liste de données fournie.
         try:
             with open(self.nom_fichier, 'w', newline='', encoding='utf-8') as file:
                 writer = csv.DictWriter(file, fieldnames=self.colonnes)
@@ -49,70 +50,82 @@ class GestionCartesCSV:
                 for ligne in reader:
                     if ligne.get("UID") == uid_recherche:
                         
+                        # Conversion  des données 
                         est_actif = str(ligne.get("Actif")).strip().lower() == "true"
                         nom = ligne.get("Nom", "Inconnu")
-                        
-                        try:
-                            credits = int(ligne.get("Credits", 0))
-                        except:
-                            credits = 0
-
-                        try:
-                            id_interne = int(ligne.get("Id", 0))
-                        except:
-                            id_interne = 0
+                        credits = ligne.get("Credits", "0")
+                        id_interne = ligne.get("Id", "")
 
                         message = "Accepté" if est_actif else "Refusé (Désactivé)"
                         
                         return est_actif, nom, message, credits, id_interne
-            
-            return False, "Non renseigné", "Refusé - Carte inconnue", 0, 0
+            return False, "Non renseigne", "Refusé - Carte inconnue", "0", ""
 
         except Exception as e:
             print(f"[ERREUR VERIFICATION] {e}")
-            return False, "Erreur", "Erreur fichier", 0, 0
+            return False, "Erreur", "Erreur fichier", "0", ""
 
     def ajouter_ou_modifier_carte(self, uid, nom, actif, credits):
-        toutes_les_lignes = self._lire_toutes_les_donnees()
+        #ajoute une nouvelle carte ou met à jour une existante.
+        toutes_les_lignes = self._lire_toutes_les_donnees() #charge les donnes en memoire
         
         carte_trouvee = False
         max_id = 0
-        id_final = 0 
+        id_final = None
 
         for ligne in toutes_les_lignes:
-            try:
-                id_courant = int(ligne.get("Id", 0))
-                if id_courant > max_id:
-                    max_id = id_courant
-            except:
-                pass
+            # Gestion de l'id
+            id_courant_str = ligne.get("Id", "0")
+            if id_courant_str and id_courant_str.isdigit():
+                id_val = int(id_courant_str)
+                if id_val > max_id:
+                    max_id = id_val
             
-            # Si c'est la carte qu'on modifie
+            # Vérification si c'est la carte qu'on veut modifier
             if ligne.get("UID") == uid:
+                # C'est une mise à jour !
                 ligne["Nom"] = nom
                 ligne["Actif"] = str(actif)
                 ligne["Credits"] = str(credits)
                 
-                id_final = id_courant 
+                # Si par hasard l'ancienne carte n'avait pas d'ID, on lui en donnera un plus tard
+                if ligne.get("Id"):
+                    id_final = ligne["Id"]
+                
                 carte_trouvee = True
 
+        # 3. Logique d'attribution d'ID et d'Ajout
         if not carte_trouvee:
-            # Nouvelle carte
-            id_final = max_id + 1
+            # Cas : C'est une NOUVELLE carte
+            nouvel_id = max_id + 1
+            id_final = str(nouvel_id)
+            
             nouvelle_ligne = {
                 "UID": uid,
                 "Nom": nom,
                 "Actif": str(actif),
                 "Credits": str(credits),
-                "Id": str(id_final) 
+                "Id": id_final
             }
             toutes_les_lignes.append(nouvelle_ligne)
             print(f"[INFO] Nouvelle carte ajoutée avec ID : {id_final}")
-        
+
+        elif not id_final:
+            # Cas : Carte existante mais qui n'avait pas d'ID (Ancien bug corrigé ici)
+            nouvel_id = max_id + 1
+            id_final = str(nouvel_id)
+            # On doit retrouver la ligne pour lui mettre l'ID
+            for ligne in toutes_les_lignes:
+                if ligne["UID"] == uid:
+                    ligne["Id"] = id_final
+                    break
+            print(f"[INFO] ID généré pour carte existante : {id_final}")
+
+        # 4. Sauvegarde finale dans le fichier
         succes = self._sauvegarder_donnees(toutes_les_lignes)
         
         if succes:
             print(f"[SUCCES] Carte {nom} enregistrée (ID: {id_final}, Credits: {credits})")
-            return True, int(id_final)
+            return True, id_final
         else:
-            return False, 0
+            return False, None
