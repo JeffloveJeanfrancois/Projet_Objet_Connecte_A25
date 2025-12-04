@@ -88,15 +88,15 @@ class CardService:
         if amount < 0:
             raise ValueError("Le montant ne peut pas etre negatif")
         
-        count = self.read_counter(uid)
+        current_count = self.read_counter(uid)
         
-        if amount > count:
-            print(f"Impossible de reduire le compteur: demande {amount}, disponible {count} (UID: {uid})")
-            return False, count
-        else:
-            new_count = count - amount
-            self.write_counter(uid, new_count)
-            return True, new_count
+        if amount > current_count:
+            print(f"Impossible de reduire le compteur: demande {amount}, disponible {current_count} (UID: {uid})")
+            return False, current_count
+        
+        new_count = current_count - amount
+        self.write_counter(uid, new_count)
+        return True, new_count
 
     def increment(self, uid: list[int], amount=1) -> int:
         """Increment the counter on the RFID card.
@@ -112,8 +112,8 @@ class CardService:
         if amount < 0:
             raise ValueError("Le montant ne peut pas etre negatif")
         
-        count = self.read_counter(uid)
-        new_value = count + amount
+        current_count = self.read_counter(uid)
+        new_value = current_count + amount
         
         if new_value >= self.MAX_COUNTER:
             new_value = self.MAX_COUNTER
