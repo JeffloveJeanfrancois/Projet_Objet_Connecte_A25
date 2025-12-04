@@ -1,7 +1,7 @@
 import time
 from rfid_lecteur import LecteurRFID
 from card_manager import CardService
-from card_utils import block_list_to_string
+from card_utils import block_list_to_string, string_to_block_list
 
 class AdminInterface:
     def __init__(self, gestion_csv, mifare : LecteurRFID, questions_admin, attendre_carte):
@@ -11,7 +11,7 @@ class AdminInterface:
         self.questions_admin = questions_admin
         self.attendre_carte = attendre_carte
 
-    def autoriser_admin(self, uid_string):
+    def autoriser_admin(self, uid_string: str):
         question_data = self.questions_admin.get(uid_string)
         if not question_data:
             return True
@@ -28,14 +28,14 @@ class AdminInterface:
 
         return False
 
-    def ask_yes_no(self, prompt):
+    def ask_yes_no(self, prompt: str):
         while True:
             rep = input(prompt).strip().lower()
             if rep in ("oui", "non"):
                 return rep == "oui"
             print("Veuillez repondre par 'oui' ou 'non'.")
 
-    def ask_int(self, prompt):
+    def ask_int(self, prompt: str):
         while True:
             rep = input(prompt).strip()
             try:
@@ -43,7 +43,7 @@ class AdminInterface:
             except ValueError:
                 print("Veuillez entrer un nombre entier valide.")
 
-    def ask_string(self, prompt, allow_empty=True):
+    def ask_string(self, prompt: str, allow_empty=True):
         while True:
             rep = input(prompt).strip()
             if allow_empty or rep:
@@ -119,7 +119,7 @@ class AdminInterface:
 
         self.menu_configuration_blocs()
 
-    def run(self, uid_admin):
+    def run(self, uid_admin: list[int]):
         print("\n=== Mode Admin active ===")
 
         while True:
@@ -179,7 +179,8 @@ class AdminInterface:
                 texte = input("Texte : ")
                 uid_carte = self.attendre_carte("Approchez la carte pour ecrire...")
 
-                error = self.mifare.ecrire_bloc(uid_carte, bloc, texte)
+                block_list = string_to_block_list(texte)
+                error = self.mifare.ecrire_bloc(uid_carte, bloc, block_list)
                 if not error:
                     print(f"Ecriture effectue avec succes!")
 

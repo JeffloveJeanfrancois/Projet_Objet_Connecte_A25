@@ -1,5 +1,4 @@
 from pirc522 import RFID
-from typing import Optional, List, Tuple
 from card_utils import string_to_block_list, block_list_to_string
 
 # ensemble de cle possible
@@ -13,7 +12,7 @@ COMMON_KEYS = [
 ]
 
 class LecteurRFID:
-    def __init__(self, rdr: Optional[RFID] = None, CLE=None):
+    def __init__(self, rdr: RFID, CLE=None):
         self.rdr = rdr
         self.CLE = CLE if CLE is not None else [0xFF] * 6
 
@@ -21,7 +20,7 @@ class LecteurRFID:
         """Vérifie si le numéro de bloc passé correspond à un bloc trailer (remorque)"""
         return (block_number + 1) % 4 == 0
 
-    def authentifier(self, uid, block: int) -> bool:
+    def authentifier(self, uid: list[int], block: int) -> bool:
         """Authentification avec toutes les clés"""
         self.rdr.select_tag(uid)
 
@@ -37,7 +36,7 @@ class LecteurRFID:
 
         return False
 
-    def ecrire_bloc(self, uid, block: int, text: str) -> bool:
+    def ecrire_bloc(self, uid: list[int], block: int, block_data: list[int]) -> bool:
         """
         Écrit une chaîne de caractères ASCII dans un bloc spécifique de la carte RFID.
 
@@ -54,9 +53,7 @@ class LecteurRFID:
             print(f"[ERREUR] Auth echouee pour le bloc {block}")
             return True
 
-        data = string_to_block_list(text)
-
-        error = self.rdr.write(block, data)
+        error = self.rdr.write(block, block_data)
         self.rdr.stop_crypto()
 
         if error:
@@ -65,7 +62,7 @@ class LecteurRFID:
 
         return False
 
-    def lire_bloc(self, uid, block: int) -> Tuple[bool, List[int]]:
+    def lire_bloc(self, uid: list[int], block: int) -> tuple[bool, list[int]]:
         """
         Lit un bloc sur la carte RFID.
 
@@ -90,7 +87,7 @@ class LecteurRFID:
 
         return False, data
 
-    def lire_blocs(self, uid, blocks: List[int]) -> str:
+    def lire_blocs(self, uid: list[int], blocks: list[int]) -> str:
         """
         Lit plusieurs blocs sur la carte RFID et retourne leur contenu formaté.
 
