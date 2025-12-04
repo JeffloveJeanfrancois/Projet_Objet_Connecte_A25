@@ -1,5 +1,4 @@
-from card_reader import CardReader
-from configuration_carte import CarteConfiguration
+from rfid_lecteur import LecteurRFID
 
 # ---- Custom exceptions ----
 class CardError(Exception):
@@ -29,7 +28,7 @@ class CardService:
     BLOCK_COUNTER = 5
     MAX_COUNTER = 999
 
-    def __init__(self, reader: CarteConfiguration):
+    def __init__(self, reader: LecteurRFID):
         self.reader = reader
 
     # ---- ID ----

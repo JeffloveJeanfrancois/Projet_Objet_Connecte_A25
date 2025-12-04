@@ -1,5 +1,6 @@
 from pirc522 import RFID
 from typing import Optional, List, Tuple
+from card_utils import string_to_block_list, block_list_to_string
 
 # ensemble de cle possible
 COMMON_KEYS = [
@@ -11,25 +12,10 @@ COMMON_KEYS = [
     [0xB0]*6,
 ]
 
-class CarteConfiguration:
-    def __init__(self, rdr: RFID | None = None, CLE=None):
+class LecteurRFID:
+    def __init__(self, rdr: Optional[RFID] = None, CLE=None):
         self.rdr = rdr
         self.CLE = CLE if CLE is not None else [0xFF] * 6
-
-    def bytes_to_printable(self, data: List[int]) -> str:
-        """Convertit des octets en caractères imprimables, remplace les octets non imprimables par '.'"""
-        return ''.join(chr(b) if 32 <= b <= 126 else '.' for b in data)
-
-    def encode_text_block(self, text: str, size: int = 16) -> List[int]:
-        """
-        Encode une chaîne de caractères en octets ASCII pour l'écriture dans un bloc RFID.
-
-        - Les caractères non-ASCII sont remplacés par '?'.
-        - Le résultat est tronqué ou complété avec des 0 pour correspondre à la taille du bloc.
-        """
-        data = list(text.encode("ascii", errors="replace")[:size])
-        data += [0] * (size - len(data))
-        return data
 
     def est_bloc_remorque(self, block_number: int) -> bool:
         """Vérifie si le numéro de bloc passé correspond à un bloc trailer (remorque)"""
@@ -68,7 +54,7 @@ class CarteConfiguration:
             print(f"[ERREUR] Auth échouée bloc {block}")
             return True
 
-        data = self.encode_text_block(text)
+        data = string_to_block_list(text)
 
         error = self.rdr.write(block, data)
         self.rdr.stop_crypto()
@@ -125,7 +111,7 @@ class CarteConfiguration:
                 print(f"[AVERTISSEMENT] Lecture du bloc {block} échouée, bloc ignoré.")
                 continue
 
-            text = self.bytes_to_printable(data)
+            text = block_list_to_string(data)
 
             # Ajoute une ligne formatée pour ce bloc
             result_lines.append(f"Bloc {block}: {text}")

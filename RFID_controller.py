@@ -7,7 +7,7 @@ from typing import Dict
 from gestion_acces import GestionAcces
 from verification import identifier_carte
 from affichage_qapass import AffichageQapass
-from configuration_carte import CarteConfiguration
+from rfid_lecteur import LecteurRFID
 from cartes_autorisees import GestionCartesCSV
 from journal_rfid import JournalRFID
 from mqtt_publisher import MqttPublisher
@@ -47,7 +47,7 @@ class RFIDController:
         self.nom_fichier = nom_fichier
         self.fichier_cartes = fichier_cartes
         self.gestion_csv = GestionCartesCSV(nom_fichier=self.fichier_cartes)
-        self.mifare = CarteConfiguration(rdr=self.rfid)
+        self.mifare = LecteurRFID(rdr=self.rfid)
         self.questions_admin = self._charger_questions_admin("pass.json")
 
         self.derniere_carte = None
