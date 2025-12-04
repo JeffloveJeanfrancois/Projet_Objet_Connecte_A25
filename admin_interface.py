@@ -98,26 +98,33 @@ class AdminInterface:
         # ------ Écriture RFID ------
         if succes and id_genere:
             print("\n[ECRITURE] Enregistrement sur la puce RFID...")
-            print(f" -> Bloc 4 (ID) : {id_genere}")
             print(f" -> Bloc 5 (Credits) : {nouveaux_credits}")
+            
+            # MODIFICATION ICI : On écrit l'ID (Bloc 4) SEULEMENT si c'est une nouvelle carte
+            if not carte_trouvee:
+                print(f" -> Bloc 4 (ID) : {id_genere}")
+            else:
+                print(f" -> Bloc 4 (ID) : Carte existante, on ne touche pas à l'ID.")
 
             uid_pour_ecriture = self.attendre_carte(
                 message=">>> Veuillez RESCANNER la carte maintenant pour finaliser l'ecriture... <<<"
             )
 
-            ok_id = self.card_service.write_card_id(uid_pour_ecriture, str(id_genere))
-
+            # MODIFICATION ICI : Condition pour ne pas écrire si la carte existait déjà
+            ok_id = True
+            if not carte_trouvee:
+                ok_id = self.card_service.write_card_id(uid_pour_ecriture, str(id_genere))
+            
             time.sleep(0.2)
 
+            # On écrit toujours les crédits (Bloc 5), car ils changemt peuvent avoir changé
             uid_pour_ecriture = self.attendre_carte(message=None)
             ok_cred = self.card_service.write_counter(uid_pour_ecriture, str(nouveaux_credits))
 
             if ok_id and ok_cred:
-                print("[SUCCES] Carte entierement configuree (CSV + Puce) !")
+                print("[SUCCES] Carte configurée !")
             else:
-                print("[ATTENTION] Une des ecritures a echoue. Verifiez les blocs.")
-
-        self.menu_configuration_blocs()
+                print("[ATTENTION] Une des écritures a échoué.")
 
     def run(self, uid_admin: list[int]):
         print("\n=== Mode Admin active ===")
