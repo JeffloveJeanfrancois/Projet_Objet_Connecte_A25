@@ -38,7 +38,7 @@ class LecteurRFID:
 
     def ecrire_bloc(self, uid: list[int], block: int, block_data: list[int]) -> bool:
         """
-        Écrit une chaîne de caractères ASCII dans un bloc spécifique de la carte RFID.
+        Écrit dans un bloc spécifique de la carte RFID.
 
         - Les blocs trailer sont interdits.
         - Retourne True si une erreur s'est produite, False sinon.
