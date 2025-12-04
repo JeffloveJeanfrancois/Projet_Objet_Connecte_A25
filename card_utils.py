@@ -23,7 +23,7 @@ def integer_to_block_bytes(value: int) -> bytes:
     Stores the integer in the first 4 bytes (big endian) and pads the rest with zeros.
     """
     int_bytes = value.to_bytes(4, "big")
-    padded_bytes = int_bytes + b"\x00" * (16 - len(int_bytes))  # Pad to 16 bytes
+    padded_bytes = int_bytes + b"\x00" * (16 - len(int_bytes))
     return padded_bytes
 
 def block_bytes_to_integer(block_bytes: bytes) -> int:
@@ -41,32 +41,25 @@ def string_to_block_list(text: str) -> list[int]:
     Only ASCII characters are supported. Truncates to 16 bytes and pads with zeros.
     Non-ASCII characters are replaced with '?'.
     """
-    encoded_bytes = text.encode("ascii", errors="replace")[:16]
-    padded_bytes = encoded_bytes.ljust(16, b"\x00")
-    return list(padded_bytes)
+    return list(string_to_block_bytes(text))
 
 def block_list_to_string(block_data: list[int]) -> str:
     """
     Convert a 16-byte block (list[int]) from pirc522 to a string.
     Stops at the first zero byte. Non-ASCII characters are replaced with '?'.
     """
-    block_bytes = bytes(block_data)
-    data_up_to_zero = block_bytes.split(b"\x00", 1)[0]
-    return data_up_to_zero.decode("ascii", errors="replace")
+    return block_bytes_to_string(bytes(block_data))
 
 def integer_to_block_list(value: int) -> list[int]:
     """
     Convert an integer to a 16-byte block represented as list[int] for pirc522.
-    Stores the integer in the first 4 bytes (little endian) and pads the rest with zeros.
+    Stores the integer in the first 4 bytes (big endian) and pads the rest with zeros.
     """
-    int_bytes = value.to_bytes(4, "little")
-    padded_bytes = int_bytes + b"\x00" * (16 - len(int_bytes))
-    return list(padded_bytes)
+    return list(integer_to_block_bytes(value))
 
 def block_list_to_integer(block_data: list[int]) -> int:
     """
     Convert a 16-byte block (list[int]) from pirc522 to an integer.
-    Reads the first 4 bytes as little endian integer.
+    Reads the first 4 bytes as big endian integer.
     """
-    int_bytes = bytes(block_data[:4])
-    return int.from_bytes(int_bytes, "little")
+    return block_bytes_to_integer(bytes(block_data[:4]))
