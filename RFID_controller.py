@@ -21,7 +21,7 @@ class RFIDController:
         self,
         broche_buzzer=33,
         delai_lecture=2,
-        nom_fichier="journal_rfid.csv",
+        nom_fichier="historique_acces.csv",
         led_rouge=38,
         led_verte=40,
         broker="broker-mqtt.canadaeast-1.ts.eventgrid.azure.net",
