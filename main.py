@@ -15,7 +15,7 @@ def main():
     # Création du lecteur RFID
     controller = RFIDController(
         broche_buzzer=33,   
-        delai_lecture=2,
+        delai_lecture=3,
         
         # --- CONFIGURATION AZURE ---
         broker=AZURE_BROKER,  

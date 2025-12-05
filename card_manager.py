@@ -90,11 +90,11 @@ class CardService:
         if amount < 0:
             raise ValueError("Le montant ne peut pas etre negatif")
         
-        if not self.reader.authentifier(uid, self.COUNTER_BLOCK):
+        if not self.reader.authentifier(uid, 5):
             raise AuthError(uid, self.COUNTER_BLOCK, "Auth echouee pour le bloc du compteur")
 
         try:
-            error, data = self.reader.rdr.read(self.COUNTER_BLOCK)
+            error, data = self.reader.rdr.read(5)
             if error or data is None or len(data) != self.BLOCK_SIZE:
                 raise ReadError(uid, "Impossible de lire le compteur correctement")
             
@@ -107,7 +107,7 @@ class CardService:
             new_count = current_count - amount
             block_data = integer_to_block_list(new_count)
 
-            error = self.reader.rdr.write(self.COUNTER_BLOCK, block_data)
+            error = self.reader.rdr.write(5, block_data)
             if error:
                 raise WriteError(uid, "Impossible de modifier le compteur")
 

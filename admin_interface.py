@@ -1,7 +1,7 @@
 import time
 from rfid_lecteur import LecteurRFID
 from card_manager import CardService
-from card_utils import block_list_to_string, string_to_block_list
+from card_utils import block_list_to_string, string_to_block_list, block_list_to_integer
 
 class AdminInterface:
     def __init__(self, gestion_csv, mifare : LecteurRFID, questions_admin, attendre_carte):
@@ -163,20 +163,27 @@ class AdminInterface:
 
         while True:
             print("\n--- Menu Bloc ---")
-            print("1. Lire un bloc")
-            print("2. Ecrire un bloc")
-            print("3. Quitter le menu bloc")
+            print("1. Lire l'id")
+            print("2. Lire les credits")
+
+            print("3. Ecrire un bloc")
+            print("4. Quitter le menu bloc")
             choix = input("Votre choix : ").strip()
 
             if choix == "1":
-                bloc = demander_bloc("lire")
                 uid_carte = self.attendre_carte("Approchez la carte a lire...")
 
-                error, contenu = self.mifare.lire_bloc(uid_carte, bloc)
+                error, contenu = self.mifare.lire_bloc(uid_carte, 4)
                 if not error and any(contenu):
                     print(f"Contenu : {block_list_to_string(contenu)}")
-
             elif choix == "2":
+                uid_carte = self.attendre_carte("Approchez la carte a lire...")
+
+                error, contenu = self.mifare.lire_bloc(uid_carte, 5)
+                if not error and any(contenu):
+                    print(f"Contenu : {block_list_to_integer(contenu)}")
+
+            elif choix == "3":
                 bloc = demander_bloc("ecrire")
 
                 texte = input("Texte : ")
@@ -187,5 +194,5 @@ class AdminInterface:
                 if not error:
                     print(f"Ecriture effectue avec succes!")
 
-            elif choix == "3":
+            elif choix == "4":
                 break
