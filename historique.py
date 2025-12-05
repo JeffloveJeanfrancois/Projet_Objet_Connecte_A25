@@ -11,6 +11,11 @@ class HistoriqueDesAcces:
         self.cartes_autorisees = self._charger_cartes_autorisees()
         self.entrees_historique = self._charger_historique()
     
+    def recharger(self):
+        """Recharge les fichiers pour obtenir les données les plus récentes."""
+        self.cartes_autorisees = self._charger_cartes_autorisees()
+        self.entrees_historique = self._charger_historique()
+    
     def _charger_cartes_autorisees(self) -> Dict:
         if not os.path.exists(self.fichier_cartes):
             print(f"Le fichier {self.fichier_cartes} n'existe pas")
@@ -193,6 +198,7 @@ def main():
         
         try:
             choix = input("\nVotre choix: ").strip()
+            historique.recharger()
             
             if choix == '0':
                 print("\nArret de l'historique")
