@@ -35,6 +35,27 @@ class AdminInterface:
                 return rep == "oui"
             print("Veuillez repondre par 'oui' ou 'non'.")
 
+    def supprimer_un_utilisateur(self):
+        print("\n--- Suppression d'utilisateur ---")
+        uid_carte = self.attendre_carte("Veuillez approcher la carte a SUPPRIMER...")
+        uid_str = "-".join(str(octet) for octet in uid_carte)
+
+        existe, nom, _, _, _ = self.gestion_csv.verifier_carte(uid_str)
+
+        if not existe:
+            print(f"Erreur : La carte {uid_str} n'existe pas dans le système.")
+            return
+
+        print(f"Carte trouvée : {nom} (UID: {uid_str})")
+        confirmation = self.ask_yes_no(f"Êtes-vous sûr de vouloir supprimer {nom} définitivement ? (oui/non) : ")
+
+        if confirmation:
+            if self.gestion_csv.supprimer_carte(uid_str):
+                print("[SUCCES] Utilisateur supprimé.")
+            else:
+                print("[ERREUR] La suppression a échoué.")
+        else:
+            print("Suppression annulée.")
     def ask_int(self, prompt: str):
         while True:
             rep = input(prompt).strip()
@@ -128,13 +149,15 @@ class AdminInterface:
         while True:
             print("\nOptions :")
             print("1. Configurer une carte (Ajout/Modif + ecriture Blocs)")
-            print("2. Quitter")
+            print("2. Supprimer un utilisateur") 
+            print("3. Quitter")
             choix = input("Votre choix: ")
 
             if choix == "1":
                 self.configurer_carte()
-
             elif choix == "2":
+                self.supprimer_un_utilisateur()
+            elif choix == "3":
                 print("Sortie du mode Admin.")
                 break
 
