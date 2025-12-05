@@ -1,6 +1,6 @@
 from rfid_lecteur import LecteurRFID
 from card_utils import block_list_to_string, block_list_to_integer, string_to_block_list, integer_to_block_list
-from card_exceptions import ReadError, WriteError
+from card_exceptions import ReadError, WriteError, AuthError
 
 class CardService:
     """Service for reading and writing RFID card data."""
@@ -83,20 +83,38 @@ class CardService:
             the decrement would result in a negative value.
         Raises:
             ValueError: If amount is negative.
+            AuthError: If authentication to the counter block fails.
+            ReadError: If reading the counter fails.
             WriteError: If writing the new counter fails.
         """
         if amount < 0:
             raise ValueError("Le montant ne peut pas etre negatif")
         
-        current_count = self.read_counter(uid)
-        
-        if amount > current_count:
-            print(f"Impossible de reduire le compteur: demande {amount}, disponible {current_count} (UID: {uid})")
-            return False, current_count
-        
-        new_count = current_count - amount
-        self.write_counter(uid, new_count)
-        return True, new_count
+        if not self.reader.authentifier(uid, self.COUNTER_BLOCK):
+            raise AuthError(uid, self.COUNTER_BLOCK, "Auth echouee pour le bloc du compteur")
+
+        try:
+            error, data = self.reader.rdr.read(self.COUNTER_BLOCK)
+            if error or data is None or len(data) != self.BLOCK_SIZE:
+                raise ReadError(uid, "Impossible de lire le compteur correctement")
+            
+            current_count = block_list_to_integer(data)
+
+            if amount > current_count:
+                print(f"Impossible de reduire le compteur: demande {amount}, disponible {current_count} (UID: {uid})")
+                return False, current_count
+            
+            new_count = current_count - amount
+            block_data = integer_to_block_list(new_count)
+
+            error = self.reader.rdr.write(self.COUNTER_BLOCK, block_data)
+            if error:
+                raise WriteError(uid, "Impossible de modifier le compteur")
+
+            return True, new_count
+        finally:
+            # Always stop crypto
+            self.reader.rdr.stop_crypto()
 
     def increment(self, uid: list[int], amount=1) -> int:
         """Increment the counter on the RFID card.

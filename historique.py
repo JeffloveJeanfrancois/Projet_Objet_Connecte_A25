@@ -3,14 +3,20 @@ import json
 import os
 import sys
 from typing import List, Dict, Optional
+from tabulate import tabulate
 
 class HistoriqueDesAcces:
     def __init__(self):
-        self.fichier_historique = "journal_rfid.csv"
+        self.fichier_historique = "historique_acces.csv"
         self.fichier_cartes = "cartes_autorisees.csv"
         self.cartes_autorisees = self._charger_cartes_autorisees()
         self.entrees_historique = self._charger_historique()
     
+    def recharger(self):
+        """Recharge les fichiers pour obtenir les données les plus récentes."""
+        self.cartes_autorisees = self._charger_cartes_autorisees()
+        self.entrees_historique = self._charger_historique()
+
     def _charger_cartes_autorisees(self) -> Dict:
         if not os.path.exists(self.fichier_cartes):
             print(f"Le fichier {self.fichier_cartes} n'existe pas")
@@ -38,13 +44,34 @@ class HistoriqueDesAcces:
             sys.exit(1)
         
         try:
-            with open(self.fichier_historique, 'r') as fichier:
-                reader = csv.DictReader(fichier)
+            with open(self.fichier_historique, 'r', newline='') as fichier:
+                premiere_ligne = fichier.readline().strip()
+                fichier.seek(0) # Retour au début du fichier
+                
                 entrees_historique = []
-                for ligne in reader:
-                    entree = self._parser_ligne(ligne)
-                    if entree:
-                        entrees_historique.append(entree)
+                
+                if 'Date/Heure' in premiere_ligne:
+                    reader = csv.DictReader(fichier)
+                    for ligne in reader:
+                        entree = self._parser_ligne(ligne)
+                        if entree:
+                            entrees_historique.append(entree)
+                else:
+                    reader = csv.reader(fichier)
+                    for ligne in reader:
+                        if len(ligne) < 4:
+                            continue
+                        ligne_dict = {
+                            'UID': ligne[0].strip(),
+                            'Nom': ligne[1].strip(),
+                            'Date/Heure': ligne[2].strip(),
+                            'Statut': ligne[3].strip(),
+                            'Type de carte': 'Inconnu',
+                        }
+                        entree = self._parser_ligne(ligne_dict)
+                        if entree:
+                            entrees_historique.append(entree)
+                
                 return entrees_historique
         except Exception as exception:
             print(f"Erreur lors de la lecture du fichier: {exception}")
@@ -105,17 +132,21 @@ class HistoriqueDesAcces:
         print("\n" + "=" * 100)
         print("HISTORIQUE DES ACCES")
         print("=" * 100)
-        print(f"{'Date/Heure':<20} | {'UID':<25} | {'Nom':<20} | {'Type':<8} | {'Resultat':<15}")
-        print("-" * 100)
-        
-        # Affichage des entrees
+
+        tableau = []
         for entree in self.entrees_historique:
             type_acces = self._determiner_type_acces(entree['statut'])
             resultat = type_acces.upper() if type_acces != 'indetermine' else entree['statut']
-            
-            print(f"{entree['date_heure']:<20} | {entree['uid']:<25} | {entree['nom']:<20} | "
-                  f"{entree['type_carte']:<8} | {resultat:<15}")
-        
+            tableau.append([
+                entree['date_heure'],
+                entree['uid'],
+                entree['nom'],
+                entree['type_carte'],
+                resultat
+            ])
+
+        headers = ['Date/Heure', 'UID', 'Nom', 'Type', 'Resultat']
+        print(tabulate(tableau, headers=headers, tablefmt='grid'))
         print("=" * 100)
         print(f"\nTotal: {len(self.entrees_historique)} entree(s)")
 
@@ -124,7 +155,6 @@ class HistoriqueDesAcces:
         filtre = filtre_choisi.lower()
         entrees_filtrees = []
         
-        # Filtrage des entrees
         for entree in self.entrees_historique:
             type_acces = self._determiner_type_acces(entree['statut'])
             
@@ -161,11 +191,18 @@ class HistoriqueDesAcces:
         print(f"Resultats: {resultat['nombre_filtre']} / {resultat['nombre_total']} entrees\n")
         
         if resultat['entrees']:
-            print(f"{'Date/Heure':<20} | {'Type':<10} | {'UID':<20} | {'Nom':<20} | {'Statut':<15}")
-            print("-" * 95)
-            for entree in resultat['entrees']:
-                print(f"{entree['date_heure']:<20} | {entree['type_carte']:<10} | {entree['uid']:<20} | "
-                      f"{entree['nom']:<20} | {entree['type_acces'].upper():<15}")
+            donnees = [
+                [
+                    entree['date_heure'],
+                    entree['type_carte'],
+                    entree['uid'],
+                    entree['nom'],
+                    entree['type_acces'].upper(),
+                ]
+                for entree in resultat['entrees']
+            ]
+            headers = ['Date/Heure', 'Type', 'UID', 'Nom', 'Statut']
+            print(tabulate(donnees, headers=headers, tablefmt='grid'))
         else:
             print(f"Aucune entree pour le filtre '{filtre}'")
 
@@ -193,6 +230,7 @@ def main():
         
         try:
             choix = input("\nVotre choix: ").strip()
+            historique.recharger()
             
             if choix == '0':
                 print("\nArret de l'historique")
@@ -211,10 +249,20 @@ def main():
                 resultat = historique.filtrer_historique('tous')
                 print("\n=== STATISTIQUES GLOBALES ===")
                 print(f"Total: {resultat['nombre_total']} entrees\n")
-                
-                for type_acces, count in resultat['statistiques'].items():
-                    pourcentage = (count / resultat['nombre_total'] * 100) if resultat['nombre_total'] > 0 else 0
-                    print(f"{type_acces.capitalize()}: {count} ({pourcentage:.1f}%)")
+
+                ordre_stats = ['autorise', 'refuse', 'alerte', 'desactive', 'indetermine']
+                stats_table = []
+                total = resultat['nombre_total']
+                for type_acces in ordre_stats:
+                    count = resultat['statistiques'].get(type_acces, 0)
+                    pourcentage = (count / total * 100) if total > 0 else 0
+                    stats_table.append([
+                        type_acces.capitalize(),
+                        count,
+                        f"{pourcentage:.1f}%"
+                    ])
+
+                print(tabulate(stats_table, headers=['Type', 'Nombre', 'Pourcentage'], tablefmt='grid'))
             else:
                 print("\nChoix invalide. Veuillez selectionner une option du menu.")
             
