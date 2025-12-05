@@ -2,7 +2,6 @@ import csv
 import os
 
 class GestionCartesCSV:
-
     def __init__(self, nom_fichier="cartes_autorisees.csv"):
         self.nom_fichier = nom_fichier
         self.colonnes = ["UID", "Nom", "Actif", "Credits", "Id"]
@@ -14,12 +13,13 @@ class GestionCartesCSV:
             try:
                 with open(self.nom_fichier, 'w', newline='', encoding='utf-8') as file:
                     writer = csv.DictWriter(file, fieldnames=self.colonnes)
-                    writer.writeheader()
+                    writer.writeheader() 
                 print("[CSV] Fichier initialisé avec succès.")
             except Exception as e:
                 print(f"[ERREUR CRITIQUE] Impossible de créer le CSV : {e}")
 
     def _lire_toutes_les_donnees(self):
+        #Charge  le contenu du fichier CSV dans une liste en mémoire
         donnees = []
         if os.path.exists(self.nom_fichier):
             try:
@@ -32,12 +32,12 @@ class GestionCartesCSV:
         return donnees
 
     def _sauvegarder_donnees(self, lignes):
-        #ecrase le fichier CSV avec la nouvelle liste de données fournie.
+        #Prend une liste  en mémoire et écrase le fichier CSV avec.
         try:
             with open(self.nom_fichier, 'w', newline='', encoding='utf-8') as file:
                 writer = csv.DictWriter(file, fieldnames=self.colonnes)
-                writer.writeheader()
-                writer.writerows(lignes)
+                writer.writeheader()      
+                writer.writerows(lignes)  
             return True
         except Exception as e:
             print(f"[ERREUR ECRITURE] Impossible de sauvegarder : {e}")
@@ -49,8 +49,6 @@ class GestionCartesCSV:
                 reader = csv.DictReader(file)
                 for ligne in reader:
                     if ligne.get("UID") == uid_recherche:
-                        
-                        # Conversion  des données 
                         est_actif = str(ligne.get("Actif")).strip().lower() == "true"
                         nom = ligne.get("Nom", "Inconnu")
                         credits = ligne.get("Credits", "0")
@@ -59,44 +57,37 @@ class GestionCartesCSV:
                         message = "Accepté" if est_actif else "Refusé (Désactivé)"
                         
                         return est_actif, nom, message, credits, id_interne
+            
             return False, "Non renseigne", "Refusé - Carte inconnue", "0", ""
-
         except Exception as e:
             print(f"[ERREUR VERIFICATION] {e}")
             return False, "Erreur", "Erreur fichier", "0", ""
 
     def ajouter_ou_modifier_carte(self, uid, nom, actif, credits):
-        #ajoute une nouvelle carte ou met à jour une existante.
-        toutes_les_lignes = self._lire_toutes_les_donnees() #charge les donnes en memoire
+        toutes_les_lignes = self._lire_toutes_les_donnees() 
         
         carte_trouvee = False
-        max_id = 0
-        id_final = None
+        max_id = 0      
+        id_final = None 
 
         for ligne in toutes_les_lignes:
-            # Gestion de l'id
             id_courant_str = ligne.get("Id", "0")
             if id_courant_str and id_courant_str.isdigit():
                 id_val = int(id_courant_str)
                 if id_val > max_id:
                     max_id = id_val
             
-            # Vérification si c'est la carte qu'on veut modifier
             if ligne.get("UID") == uid:
-                # C'est une mise à jour !
                 ligne["Nom"] = nom
                 ligne["Actif"] = str(actif)
                 ligne["Credits"] = str(credits)
                 
-                # Si par hasard l'ancienne carte n'avait pas d'ID, on lui en donnera un plus tard
                 if ligne.get("Id"):
                     id_final = ligne["Id"]
-                
                 carte_trouvee = True
 
-        # 3. Logique d'attribution d'ID et d'Ajout
+        # nouvelles cartes sans ID
         if not carte_trouvee:
-            # Cas : C'est une NOUVELLE carte
             nouvel_id = max_id + 1
             id_final = str(nouvel_id)
             
@@ -108,24 +99,55 @@ class GestionCartesCSV:
                 "Id": id_final
             }
             toutes_les_lignes.append(nouvelle_ligne)
-            print(f"[INFO] Nouvelle carte ajoutée avec ID : {id_final}")
+            print(f" Nouvelle carte ajoutée avec ID : {id_final}")
 
-        elif not id_final:
-            # Cas : Carte existante mais qui n'avait pas d'ID (Ancien bug corrigé ici)
-            nouvel_id = max_id + 1
-            id_final = str(nouvel_id)
-            # On doit retrouver la ligne pour lui mettre l'ID
-            for ligne in toutes_les_lignes:
-                if ligne["UID"] == uid:
-                    ligne["Id"] = id_final
-                    break
-            print(f"[INFO] ID généré pour carte existante : {id_final}")
-
-        # 4. Sauvegarde finale dans le fichier
         succes = self._sauvegarder_donnees(toutes_les_lignes)
         
         if succes:
-            print(f"[SUCCES] Carte {nom} enregistrée (ID: {id_final}, Credits: {credits})")
+            print(f"Carte {nom} enregistrée (ID: {id_final}, Credits: {credits})")
             return True, id_final
         else:
             return False, None
+
+    def mettre_a_jour_credits(self, uid, nouveaux_credits):
+        toutes_les_lignes = self._lire_toutes_les_donnees()
+        
+        maj_effectuee = False
+        for ligne in toutes_les_lignes:
+            if ligne.get("UID") == uid:
+                ligne["Credits"] = str(nouveaux_credits)
+                maj_effectuee = True
+                break  
+        if maj_effectuee:
+            succes = self._sauvegarder_donnees(toutes_les_lignes)
+            if succes:
+                print(f"[CSV] Crédits mis à jour pour {uid}: {nouveaux_credits}")
+                return True
+        
+        print(f"[ERREUR] Carte {uid} non trouvée ou échec sauvegarde")
+        return False
+
+    def decrementer_un_credit(self, uid):
+        toutes_les_lignes = self._lire_toutes_les_donnees()
+        modification_faite = False
+        for ligne in toutes_les_lignes:
+            if ligne.get("UID") == uid:
+                try:
+                    credits_actuels = int(ligne.get("Credits", "0"))
+                except ValueError:
+                    credits_actuels = 0
+
+                if credits_actuels > 0:
+                    ligne["Credits"] = str(credits_actuels - 1)
+                    modification_faite = True
+                    print(f"[CSV] Décrémentation pour {uid} : {credits_actuels} -> {credits_actuels - 1}")
+                else:
+                    print(f"[CSV] Échec : Solde à 0 pour {uid}")
+                    return False
+                
+                break 
+        
+        if modification_faite:
+            return self._sauvegarder_donnees(toutes_les_lignes)
+        
+        return False

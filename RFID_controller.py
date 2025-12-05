@@ -129,6 +129,7 @@ class RFIDController:
         success, remaining = self.card_service.decrement(card_uid, credit_cost)
     
         if success:
+            return remaining # ajout pour mettre le reste dans le csv directement
             print(f"{credit_cost} credit utilise - il reste {remaining} credit(s).")
         else:
             print(f"Decrementation impossible - credit restant : {remaining}.")
@@ -198,6 +199,12 @@ class RFIDController:
                         else:
                             try:
                                 self.simulateActionCost(uid_carte, 1)
+
+                                
+                                #succes_decrementation, nouveaux_credits = self.simulateActionCost(uid_carte, 1)
+                                #if succes_decrementation : 
+                                #    self.gestion_csv.mettre_a_jour_credits(uid_string, nouveaux_credits)
+                                #self.gestion_csv.decrementer_un_credit(uid_string)
                             except Exception as err:
                                 print(f"[ERREUR ECRITURE CREDITS] {err}")
                             finally:
