@@ -3,6 +3,7 @@ import json
 import os
 import sys
 from typing import List, Dict, Optional
+import tabulate
 
 class HistoriqueDesAcces:
     def __init__(self):
@@ -166,11 +167,18 @@ class HistoriqueDesAcces:
         print(f"Resultats: {resultat['nombre_filtre']} / {resultat['nombre_total']} entrees\n")
         
         if resultat['entrees']:
-            print(f"{'Date/Heure':<20} | {'Type':<10} | {'UID':<20} | {'Nom':<20} | {'Statut':<15}")
-            print("-" * 95)
-            for entree in resultat['entrees']:
-                print(f"{entree['date_heure']:<20} | {entree['type_carte']:<10} | {entree['uid']:<20} | "
-                      f"{entree['nom']:<20} | {entree['type_acces'].upper():<15}")
+            donnees = [
+                [
+                    entree['date_heure'],
+                    entree['type_carte'],
+                    entree['uid'],
+                    entree['nom'],
+                    entree['type_acces'].upper(),
+                ]
+                for entree in resultat['entrees']
+            ]
+            headers = ['Date/Heure', 'Type', 'UID', 'Nom', 'Statut']
+            print(tabulate(donnees, headers=headers, tablefmt='grid'))
         else:
             print(f"Aucune entree pour le filtre '{filtre}'")
 
