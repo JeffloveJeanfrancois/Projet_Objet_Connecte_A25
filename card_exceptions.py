@@ -19,3 +19,9 @@ class InsufficientCounter(CardError):
         self.uid = uid
         self.requested = requested
         self.available = available
+
+class AuthError(CardError):
+    def __init__(self, uid: list[int], block: int, message="Auth echouee pour le bloc"):
+        super().__init__(f"{message} (Block: {block}, UID: {uid})")
+        self.uid = uid
+        self.block = block
