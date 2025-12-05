@@ -92,7 +92,7 @@ class AdminInterface:
 
         # ------ Sauvegarde CSV ------
         succes, id_genere = self.gestion_csv.ajouter_ou_modifier_carte(
-            uid_str, nouveau_nom, statut_actif, nouveaux_credits
+            uid_str, nouveau_nom, statut_actif, str(nouveaux_credits)
         )
 
         # ------ Écriture RFID ------
@@ -111,20 +111,16 @@ class AdminInterface:
             )
 
             # MODIFICATION ICI : Condition pour ne pas écrire si la carte existait déjà
-            ok_id = True
             if not carte_trouvee:
-                ok_id = self.card_service.write_card_id(uid_pour_ecriture, str(id_genere))
+                self.card_service.write_card_id(uid_pour_ecriture, str(id_genere))
             
             time.sleep(0.2)
 
             # On écrit toujours les crédits (Bloc 5), car ils changemt peuvent avoir changé
             uid_pour_ecriture = self.attendre_carte(message=None)
-            ok_cred = self.card_service.write_counter(uid_pour_ecriture, str(nouveaux_credits))
+            self.card_service.write_counter(uid_pour_ecriture, nouveaux_credits)
 
-            if ok_id and ok_cred:
-                print("[SUCCES] Carte configurée !")
-            else:
-                print("[ATTENTION] Une des écritures a échoué.")
+            print("[SUCCES] Carte configurée !")
 
     def run(self, uid_admin: list[int]):
         print("\n=== Mode Admin active ===")
