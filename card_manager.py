@@ -130,13 +130,28 @@ class CardService:
         if amount < 0:
             raise ValueError("Le montant ne peut pas etre negatif")
         
-        current_count = self.read_counter(uid)
-        new_value = current_count + amount
+        if not self.reader.authentifier(uid, 5):
+            raise AuthError(uid, self.COUNTER_BLOCK, "Auth echouee pour le bloc du compteur")
         
-        if new_value >= self.MAX_COUNTER:
-            new_value = self.MAX_COUNTER
-            print(f"Compteur max atteint pour UID {uid}")
-        
-        self.write_counter(uid, new_value)
-        
-        return new_value
+        try:
+            error, data = self.reader.rdr.read(5)
+            if error or data is None or len(data) != self.BLOCK_SIZE:
+                raise ReadError(uid, "Impossible de lire le compteur correctement")
+            
+            current_count = block_list_to_integer(data)
+            new_count = current_count + amount
+            
+            if new_count >= self.MAX_COUNTER:
+                new_count = self.MAX_COUNTER
+                print(f"Compteur max atteint pour UID {uid}")
+                
+            block_data = integer_to_block_list(new_count)
+            
+            error = self.reader.rdr.write(5, block_data)
+            if error:
+                raise WriteError(uid, "Impossible de modifier le compteur")
+            
+            return True, new_count
+        finally:
+            # Always stop crypto
+            self.reader.rdr.stop_crypto()
