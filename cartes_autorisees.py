@@ -151,3 +151,17 @@ class GestionCartesCSV:
             return self._sauvegarder_donnees(toutes_les_lignes)
         
         return False
+    
+    def supprimer_carte(self, uid):
+        toutes_les_lignes = self._lire_toutes_les_donnees()
+        
+        lignes_restantes = [ligne for ligne in toutes_les_lignes if ligne.get("UID") != uid]
+
+        if len(lignes_restantes) < len(toutes_les_lignes):
+            succes = self._sauvegarder_donnees(lignes_restantes)
+            if succes:
+                print(f"[CSV] Carte {uid} supprimée de la base de données.")
+                return True
+        
+        print(f"[CSV] Carte {uid} introuvable ou erreur de sauvegarde.")
+        return False
