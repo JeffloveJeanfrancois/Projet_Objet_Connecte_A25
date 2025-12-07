@@ -27,7 +27,18 @@ class AdminInterface:
             print(f"Reponse incorrecte. Essais restants: {tentatives}.")
 
         return False
-
+    def ask_time(self, prompt: str, allow_empty=True):
+        while True:
+            rep = input(prompt).strip()
+            if allow_empty and rep == "":
+                return ""
+            # verification du format HH:MM
+            try:
+                import datetime
+                datetime.datetime.strptime(rep, "%H:%M")
+                return rep
+            except ValueError:
+                print("Format invalide. Veuillez utiliser le format HH:MM (ex: 14:30).")
     def ask_yes_no(self, prompt: str):
         while True:
             rep = input(prompt).strip().lower()
@@ -87,6 +98,9 @@ class AdminInterface:
         nouveau_nom = nom_actuel if carte_trouvee else ""
         statut_actif = True
         nouveaux_credits = "0"
+        expiration = ""
+        debut = ""
+        fin = ""
 
         # ------ Carte EXISTANTE ------
         if carte_trouvee:
@@ -98,7 +112,11 @@ class AdminInterface:
                 nouveau_nom = self.ask_string("Nom : ")
                 statut_actif = self.ask_yes_no("Activer ? (oui/non) : ")
                 nouveaux_credits = self.ask_int("Nouveau nombre de credits : ")
-                
+                expiration = input("Date d'expiration (AAAA-MM-JJ) ou Entrée pour aucune : ").strip()
+                debut = self.ask_time("Heure de début (HH:MM) ou Entrée pour accès 24h/24 : ")
+                fin = ""
+                if debut:
+                    fin = self.ask_time("Heure de fin (HH:MM) : ", allow_empty=False)
             else:
                 print("Menu de lecture/ecriture")
                 self.menu_configuration_blocs()
@@ -110,10 +128,15 @@ class AdminInterface:
             nouveau_nom = self.ask_string("Nom : ")
             statut_actif = self.ask_yes_no("Activer ? (oui/non) : ")
             nouveaux_credits = self.ask_int("Credits : ")
+            expiration = input("Date d'expiration (AAAA-MM-JJ) ou Entrée pour aucune : ").strip()
+            debut = self.ask_time("Heure de début (HH:MM) ou Entrée pour accès 24h/24 : ")
+            fin = ""
+            if debut:
+                fin = self.ask_time("Heure de fin (HH:MM) : ", allow_empty=False) 
 
         # ------ Sauvegarde CSV ------
         succes, id_genere = self.gestion_csv.ajouter_ou_modifier_carte(
-            uid_str, nouveau_nom, statut_actif, str(nouveaux_credits)
+            uid_str, nouveau_nom, statut_actif, str(nouveaux_credits), expiration, debut, fin
         )
 
         # ------ Écriture RFID ------
@@ -130,6 +153,10 @@ class AdminInterface:
             uid_pour_ecriture = self.attendre_carte(
                 message=">>> Veuillez RESCANNER la carte maintenant pour finaliser l'ecriture... <<<"
             )
+            uid_str_verif = "-".join(str(octet) for octet in uid_pour_ecriture)
+            if uid_str_verif != uid_str:
+                print("[ERREUR] Ce n'est pas la même carte ! Annulation.")
+            return
 
             # MODIFICATION ICI : Condition pour ne pas écrire si la carte existait déjà
             if not carte_trouvee:
@@ -150,14 +177,17 @@ class AdminInterface:
             print("\nOptions :")
             print("1. Configurer une carte (Ajout/Modif + ecriture Blocs)")
             print("2. Supprimer un utilisateur") 
-            print("3. Quitter")
+            print("3. Voir la liste des utilisateurs")
+            print("4. Quitter")
             choix = input("Votre choix: ")
 
             if choix == "1":
                 self.configurer_carte()
             elif choix == "2":
                 self.supprimer_un_utilisateur()
-            elif choix == "3":
+            elif choix == "3" :
+                self.gestion_csv.afficher_toutes_les_cartes() 
+            elif choix == "4":
                 print("Sortie du mode Admin.")
                 break
 
