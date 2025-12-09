@@ -253,6 +253,12 @@ def main():
                 ordre_stats = ['autorise', 'refuse', 'alerte', 'desactive', 'indetermine']
                 stats_table = []
                 total = resultat['nombre_total']
+
+                if total == 0:
+                    print("Aucune entree disponible: impossible de calculer des pourcentages.")
+                    input("\nAppuyez sur Entree pour continuer...")
+                    continue
+
                 for type_acces in ordre_stats:
                     count = resultat['statistiques'].get(type_acces, 0)
                     pourcentage = (count / total * 100) if total > 0 else 0
