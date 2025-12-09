@@ -1,0 +1,133 @@
+# Système de Contrôle d'Accès RFID Connecté (IoT)
+
+Ce projet est un système complet de gestion d'accès par cartes RFID, développé en Python sur Raspberry Pi. Il intègre une authentification locale (fichiers CSV), une gestion avancée des droits (crédits, horaires, jours), une interface d'administration physique et une journalisation dans le cloud via Azure MQTT.
+
+Réalisé dans le cadre du cours d'Objets Connectés (Session A25).
+
+##  Fonctionnalités
+
+* **Authentification RFID** : Lecture des cartes MIFARE Classic 1K via le lecteur RC522.
+* **Feedback Utilisateur** : Affichage sur écran LCD 16x2, indications lumineuses (LEDs) et sonores (Buzzer).
+* **Gestion des Accès** :
+    * Validation par UID unique.
+    * Gestion de **crédits d'accès** (décrémentation stockée directement sur la carte - Bloc 5).
+    * Restrictions par **plages horaires** et **jours de la semaine**.
+    * Dates d'expiration des cartes.
+* **Mode Administrateur** : Interface en ligne de commande (CLI) sécurisée par une "Carte Admin" et une question de sécurité pour ajouter/modifier/supprimer des utilisateurs.
+* **IoT & Cloud** : Publication sécurisée des logs d'accès vers **Azure Event Grid (MQTT)** via TLS mutuel (mTLS).
+* **Anti-double scan** : Protection temporaire pour éviter de scanner la même carte plusieurs fois de suite.
+
+##  Matériel Requis
+
+Pour reproduire ce projet, vous aurez besoin du matériel suivant :
+
+* **Raspberry Pi** (3, 4 ou 400) avec Raspberry Pi OS.
+* **Lecteur RFID RC522** (SPI).
+* **Écran LCD 16x2** avec module I2C (ex: QAPASS).
+* **LEDs** (1x Verte, 1x Rouge).
+* **Buzzer** passif ou actif.
+* **Cartes/Badges RFID** (13.56 MHz, protocole MIFARE).
+* Breadboard et câbles Jumper (Femelle-Femelle / Mâle-Femelle).
+
+### Câblage (GPIO - Board Mode)
+
+| Composant | Broche Pi (Board) | Fonction |
+| :--- | :--- | :--- |
+| **Buzzer** | Pin 33 | Sortie Sonore |
+| **LED Rouge** | Pin 38 | Indicateur Refus |
+| **LED Verte** | Pin 40 | Indicateur Succès |
+| **LCD (I2C)** | SDA (Pin 3), SCL (Pin 5) | Affichage |
+| **RC522** | SPI0 (MOSI, MISO, SCK, SDA/CE0, RST) | Lecture RFID |
+
+> *Note : Assurez-vous d'activer les interfaces SPI et I2C via `sudo raspi-config`.*
+
+##  Installation
+
+1.  **Cloner le dépôt :**
+    ```bash
+    git clone https://github.com/JeffloveJeanfrancois/Projet_Objet_Connecte_A25.git 
+    cd Projet_Objet_Connecte_A25
+    ```
+
+2.  **Créer un environnement virtuel (recommandé) :**
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    ```
+
+3.  **Installer les dépendances :**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4.  **Configuration des certificats (MQTT) :**
+    Placez vos certificats Azure dans un dossier `certs/` à la racine du projet :
+    * `client-publisher.pem`
+    * `client-publisher.key`
+    * *Note : Les certificats ne sont pas inclus dans le dépôt pour des raisons de sécurité.*
+
+##  Manuel d'Utilisation
+
+### 1. Démarrage du Système
+Une fois le Raspberry Pi allumé et le matériel branché :
+1.  Ouvrez un terminal.
+2.  Placez-vous dans le dossier du projet.
+3.  Lancez la commande :
+    ```bash
+    python main.py
+    ```
+4.  L'écran LCD affichera le message d'accueil : **"APPROCHEZ VOTRE CARTE RFID"**.
+
+### 2. Accès Utilisateur (Mode Standard)
+C'est le mode par défaut.
+* **Action :** L'utilisateur approche sa carte du lecteur.
+* **Succès :** Si la carte est valide, active et a des crédits :
+    * L'écran affiche : *"ACCES ACCEPTE / Bienvenue [Nom]"*.
+    * La LED verte s'allume et un bip court retentit.
+    * **1 crédit est débité** automatiquement de la carte (écriture sur puce).
+* **Échec :** Si la carte est inconnue, désactivée, expirée ou sans crédits :
+    * L'écran affiche : *"ACCES REFUSE / [Raison]"*.
+    * La LED rouge s'allume et un bip long retentit.
+
+### 3. Administration du Système
+Pour ajouter des crédits ou gérer les cartes, il ne faut pas arrêter le programme, mais utiliser le mode Admin intégré.
+
+#### Entrer en mode Admin
+1.  Scannez une **Carte Administrateur** (l'UID de cette carte doit être pré-configuré dans le fichier `pass.json`).
+2.  Le système se met en pause et demande une authentification dans le terminal.
+3.  **Question de sécurité** : Le terminal affiche une question (ex: *"Quel est le nom de votre chat"*).
+4.  Tapez la réponse correcte (définie dans `pass.json`) et validez avec `Entrée`.
+
+#### Menu Principal Admin
+Une fois authentifié, tapez le numéro de l'option choisie :
+* `1` : **Configurer une carte** (Création ou Modification).
+* `2` : **Supprimer un utilisateur**.
+* `3` : **Voir la liste** (Affiche un tableau complet des utilisateurs).
+* `4` : **Quitter** (Retour au mode lecture normal).
+
+#### Procédure : Ajouter ou Recharger une carte (Option 1)
+1.  Sélectionnez l'option `1`.
+2.  Le système demande : *"Veuillez approcher la carte à configurer..."*. Scannez la carte client.
+3.  Le système détecte si la carte est nouvelle ou existante.
+4.  Suivez les instructions à l'écran pour définir :
+    * **Nom** de l'utilisateur.
+    * **Activation** (`oui`/`non`).
+    * **Crédits** (ex: `10`).
+    * **Expiration** (Date) et **Horaires** (Heures début/fin).
+    * **Jours autorisés** (ex: `0-1-2-3-4` pour la semaine).
+5.  **Confirmation** : Le système demandera de **rescanner la carte** pour écrire les nouvelles données (ID et Crédits) directement dans la mémoire de la carte RFID.
+
+### 4. Consultation des Logs (Historique)
+Pour voir qui est entré et quand, ouvrez un **nouveau terminal** (ne fermez pas le programme principal) et lancez :
+```bash
+python historique.py
+
+## Membres de l'équipe
+
+Projet réalisé par :
+* **Jeff-love Jean-Francois**
+* **zakaria Morjani**
+* **Fabrice Kouakou**
+* **Daniel Cloutier**
+* **Cristelle Affala N'dri**
+* **Jeffrey Busque**
