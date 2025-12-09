@@ -160,13 +160,13 @@ class AdminInterface:
 
             # MODIFICATION ICI : Condition pour ne pas écrire si la carte existait déjà
             if not carte_trouvee:
-                self.card_service.write_card_id(uid_pour_ecriture, str(id_genere))
+                self.card_service.write_card_id(str(id_genere), uid_pour_ecriture)
             
             time.sleep(0.2)
 
             # On écrit toujours les crédits (Bloc 5), car ils changemt peuvent avoir changé
             uid_pour_ecriture = self.attendre_carte(message=None)
-            self.card_service.write_counter(uid_pour_ecriture, nouveaux_credits)
+            self.card_service.write_counter(nouveaux_credits, uid_pour_ecriture)
 
             print("[SUCCES] Carte configurée !")
 
@@ -226,13 +226,13 @@ class AdminInterface:
             if choix == "1":
                 uid_carte = self.attendre_carte("Approchez la carte a lire...")
 
-                error, contenu = self.mifare.lire_bloc(uid_carte, 4)
+                error, contenu = self.mifare.lire_bloc(4, uid_carte)
                 if not error and any(contenu):
                     print(f"Contenu : {block_list_to_string(contenu)}")
             elif choix == "2":
                 uid_carte = self.attendre_carte("Approchez la carte a lire...")
 
-                error, contenu = self.mifare.lire_bloc(uid_carte, 5)
+                error, contenu = self.mifare.lire_bloc(5, uid_carte)
                 if not error and any(contenu):
                     print(f"Contenu : {block_list_to_integer(contenu)}")
 
@@ -243,7 +243,7 @@ class AdminInterface:
                 uid_carte = self.attendre_carte("Approchez la carte pour ecrire...")
 
                 block_list = string_to_block_list(texte)
-                error = self.mifare.ecrire_bloc(uid_carte, bloc, block_list)
+                error = self.mifare.ecrire_bloc(bloc, block_list, uid_carte)
                 if not error:
                     print(f"Ecriture effectue avec succes!")
 

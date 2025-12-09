@@ -1,5 +1,6 @@
 from pirc522 import RFID
 from card_utils import string_to_block_list, block_list_to_string
+from typing import Optional
 
 # ensemble de cle possible
 COMMON_KEYS = [
@@ -12,6 +13,8 @@ COMMON_KEYS = [
 ]
 
 class LecteurRFID:
+    BLOCK_SIZE = 16
+
     def __init__(self, rdr: RFID, CLE=None):
         self.rdr = rdr
         self.CLE = CLE if CLE is not None else [0xFF] * 6
@@ -36,56 +39,82 @@ class LecteurRFID:
 
         return False
 
-    def ecrire_bloc(self, uid: list[int], block: int, block_data: list[int]) -> bool:
+    def ecrire_bloc(self, block: int, block_data: list[int], uid: Optional[list[int]] = None, auto_auth: bool = True) -> bool:
         """
         Écrit dans un bloc spécifique de la carte RFID.
-
         - Les blocs trailer sont interdits.
-        - Retourne True si une erreur s'est produite, False sinon.
+        Args:
+            block: Numéro du bloc à lire.
+            block_data: Liste de 16 octets à écrire dans le bloc.
+            uid: UID de la carte (requis si auto_auth=True, peut être None sinon).
+            auto_auth: 
+                - True: authentifie automatiquement et stop_crypto() après.
+                - False: laisse l'appelant gérer l'authentification.
+        Returns:
+            bool: True si une erreur s'est produite, False sinon
         """
         if self.est_bloc_remorque(block):
             print(f"[ERREUR] Bloc trailer {block}, ecriture interdite.")
             return True
  
-        if not self.authentifier(uid, block):
-            print(f"[ERREUR] Auth echouee pour le bloc {block}")
-            return True
+        if auto_auth:
+            if uid is None:
+                print(f"[ERREUR] L'UID est requis lorsque auto_auth est vrai.")
+                return True
+            if not self.authentifier(uid, block):
+                print(f"[ERREUR] Auth echouee pour le bloc {block}")
+                return True
 
-        error = self.rdr.write(block, block_data)
-        self.rdr.stop_crypto()
+        try:
+            error = self.rdr.write(block, block_data)
+            if error:
+                print(f"[ERREUR] Ecriture echouee bloc {block}")
+                return True
+            
+            return False
+        finally:
+            if auto_auth:
+                self.rdr.stop_crypto()
 
-        if error:
-            print(f"[ERREUR] Ecriture echouee bloc {block}")
-            return True
-
-        return False
-
-    def lire_bloc(self, uid: list[int], block: int) -> tuple[bool, list[int]]:
+    def lire_bloc(self, block: int, uid: Optional[list[int]] = None, auto_auth: bool = True) -> tuple[bool, list[int]]:
         """
         Lit un bloc sur la carte RFID.
-
-        Retourne un tuple : (error: bool, data: List[int])
-        - error : True si une erreur s'est produite, False sinon
-        - data : liste de 16 octets si lecture réussie, liste vide en cas d'erreur
+        - Les blocs trailer sont interdits.
+        Args:
+            block: Numéro du bloc à lire.
+            uid: UID de la carte (requis si auto_auth=True, peut être None sinon).
+            auto_auth: 
+                - True: authentifie automatiquement et stop_crypto() après.
+                - False: laisse l'appelant gérer l'authentification.
+        Returns:
+            tuple: [bool, list[int]]
+                - error: True si une erreur s'est produite, False sinon
+                - data: liste de 16 octets si lecture réussie, liste vide en cas d'erreur
         """
         if self.est_bloc_remorque(block):
             print(f"[INFO] Bloc {block} est un trailer — lecture interdite.")
             return True, []
 
-        if not self.authentifier(uid, block):
-            print(f"[ERREUR] Auth echouee pour le bloc {block}")
-            return True, []
+        if auto_auth:
+            if uid is None:
+                print(f"[ERREUR] L'UID est requis lorsque auto_auth est vrai.")
+                return True, []
+            if not self.authentifier(uid, block):
+                print(f"[ERREUR] Auth echouee pour le bloc {block}")
+                return True, []
 
-        error, data = self.rdr.read(block)
-        self.rdr.stop_crypto()
+        try:
+            error, data = self.rdr.read(block)
+            if error or data is None or len(data) != self.BLOCK_SIZE:
+                print(f"[ERREUR] Lecture bloc {block} impossible")
+                return True, []
+            
+            return False, data
+        finally:
+            if auto_auth:
+                self.rdr.stop_crypto()
 
-        if error or data is None or len(data) != 16:
-            print(f"[ERREUR] Lecture bloc {block} impossible")
-            return True, []
-
-        return False, data
-
-    def lire_blocs(self, uid: list[int], blocks: list[int]) -> str:
+    def lire_blocs(self, blocks: list[int], uid: list[int], ) -> str:
         """
         Lit plusieurs blocs sur la carte RFID et retourne leur contenu formaté.
 
@@ -100,7 +129,7 @@ class LecteurRFID:
             if self.est_bloc_remorque(block):
                 continue
             
-            error, data = self.lire_bloc(uid, block)
+            error, data = self.lire_bloc(block, uid)
 
             if error:
                 print(f"[AVERTISSEMENT] Lecture du bloc {block} a echouee, bloc ignore.")
