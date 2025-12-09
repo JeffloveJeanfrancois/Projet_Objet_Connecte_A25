@@ -53,9 +53,9 @@ class AdminInterface:
         uid_carte = self.attendre_carte("Veuillez approcher la carte a SUPPRIMER...")
         uid_str = "-".join(str(octet) for octet in uid_carte)
 
-        existe, nom, _, _, _ = self.gestion_csv.verifier_carte(uid_str)
+        actif, nom, _, _, _ = self.gestion_csv.verifier_carte(uid_str)
 
-        if not existe:
+        if not actif:
             print(f"Erreur : La carte {uid_str} n'existe pas dans le système.")
             return
 
@@ -69,7 +69,27 @@ class AdminInterface:
                 print("[ERREUR] La suppression a échoué.")
         else:
             print("Suppression annulée.")
-
+    def ask_days(self):
+        print("\nConfiguration des Jours ")
+        print("0=Lun, 1=Mar, 2=Mer, 3=Jeu, 4=Ven, 5=Sam, 6=Dim")
+        print("Exemple Semaine : 0-1-2-3-4 || Exemple Weekend : 5-6")
+        
+        while True:
+            reponse = input("Jours autorisés (séparés par tirets) ou Entrée pour tous : ").strip()
+            
+            if reponse == "":
+                return "" 
+            # Validation du format (chiffres 0-6 et tirets uniquement)
+            jours = reponse.split('-')
+            valid = True
+            for jour in jours:
+                if not jour.isdigit() or not (0 <= int(jour) <= 6):
+                    valid = False
+                    break
+            if valid:
+                return reponse
+            else:
+                print("Format invalide. Utilisez uniquement 0 à 6 séparés par des tirets '-'.")
     def ask_int(self, prompt: str):
         while True:
             rep = input(prompt).strip()
@@ -95,7 +115,7 @@ class AdminInterface:
             return
         
         # Vérifier si elle existe dans le CSV
-        existe, nom_actuel, _, _, _ = self.gestion_csv.verifier_carte(uid_str)
+        _, nom_actuel, _, _, _ = self.gestion_csv.verifier_carte(uid_str)
         carte_trouvee = nom_actuel != "Non renseigne"
 
         nouveau_nom = nom_actuel if carte_trouvee else ""
@@ -104,6 +124,7 @@ class AdminInterface:
         expiration = ""
         debut = ""
         fin = ""
+        jours = ""
 
         # ------ Carte EXISTANTE ------
         if carte_trouvee:
@@ -120,6 +141,8 @@ class AdminInterface:
                 fin = ""
                 if debut:
                     fin = self.ask_time("Heure de fin (HH:MM) : ", allow_empty=False)
+                jours = self.ask_days()
+
             else:
                 print("Menu de lecture/ecriture")
                 self.menu_configuration_blocs()
@@ -136,10 +159,11 @@ class AdminInterface:
             fin = ""
             if debut:
                 fin = self.ask_time("Heure de fin (HH:MM) : ", allow_empty=False) 
+            jours = self.ask_days()
 
         # ------ Sauvegarde CSV ------
         succes, id_genere = self.gestion_csv.ajouter_ou_modifier_carte(
-            uid_str, nouveau_nom, statut_actif, str(nouveaux_credits), expiration, debut, fin
+            uid_str, nouveau_nom, statut_actif, str(nouveaux_credits), expiration, debut, fin,jours
         )
 
         # ------ Écriture RFID ------
