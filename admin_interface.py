@@ -27,6 +27,7 @@ class AdminInterface:
             print(f"Reponse incorrecte. Essais restants: {tentatives}.")
 
         return False
+
     def ask_time(self, prompt: str, allow_empty=True):
         while True:
             rep = input(prompt).strip()
@@ -39,6 +40,7 @@ class AdminInterface:
                 return rep
             except ValueError:
                 print("Format invalide. Veuillez utiliser le format HH:MM (ex: 14:30).")
+
     def ask_yes_no(self, prompt: str):
         while True:
             rep = input(prompt).strip().lower()
@@ -67,6 +69,7 @@ class AdminInterface:
                 print("[ERREUR] La suppression a échoué.")
         else:
             print("Suppression annulée.")
+
     def ask_int(self, prompt: str):
         while True:
             rep = input(prompt).strip()
@@ -156,7 +159,7 @@ class AdminInterface:
             uid_str_verif = "-".join(str(octet) for octet in uid_pour_ecriture)
             if uid_str_verif != uid_str:
                 print("[ERREUR] Ce n'est pas la même carte ! Annulation.")
-            return
+                return
 
             # MODIFICATION ICI : Condition pour ne pas écrire si la carte existait déjà
             if not carte_trouvee:
