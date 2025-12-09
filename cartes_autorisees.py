@@ -5,7 +5,7 @@ from tabulate import tabulate
 class GestionCartesCSV:
     def __init__(self, nom_fichier="cartes_autorisees.csv"):
         self.nom_fichier = nom_fichier
-        self.colonnes = ["UID", "Nom", "Actif", "Credits", "Id", "Expiration", "Debut", "Fin"]        
+        self.colonnes = ["UID", "Nom", "Actif", "Credits", "Id", "Expiration", "Debut", "Fin","Jours"]        
         self._initialiser_fichier()
 
     def _initialiser_fichier(self):
@@ -49,7 +49,8 @@ class GestionCartesCSV:
         toutes_les_lignes = self._lire_toutes_les_donnees()
         carte_trouvee = False
         ligne_modifiee = None
-        
+        acces_horaire = False
+
         nom = "Inconnu"
         message = "Refusé - Carte inconnue"
         credits = "0"
@@ -77,6 +78,18 @@ class GestionCartesCSV:
                             message = f"Refusé (Expiré le {expiration_str})"
                     except ValueError:
                         pass
+                # jours de la semaine
+                jours_autorises = ligne.get("Jours", "")
+                if est_actif and jours_autorises:
+                    #0=lundi/6=dimanche
+                    jour_actuel = str(datetime.now().weekday()) 
+                    liste_jours = jours_autorises.split("-") 
+                    
+                    if jour_actuel not in liste_jours:
+                        est_actif = False
+                        jours_noms = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
+                        nom_jour = jours_noms[int(jour_actuel)]
+                        message = f"Refusé pour la journée du {nom_jour}"
 
                 heure_debut_str = ligne.get("Debut", "")
                 heure_fin_str = ligne.get("Fin", "")
@@ -86,9 +99,7 @@ class GestionCartesCSV:
                         maintenant = datetime.now().time()
                         debut = datetime.strptime(heure_debut_str, "%H:%M").time()
                         fin = datetime.strptime(heure_fin_str, "%H:%M").time()
-        
-                        acces_horaire = False
-        
+                
                         if debut <= fin:
                             # Cas entre 08:00 et 16:00
                             if debut <= maintenant <= fin:
@@ -116,7 +127,7 @@ class GestionCartesCSV:
         else:
             return False, "Non renseigne", "Refusé - Carte inconnue", "0", ""
 
-    def ajouter_ou_modifier_carte(self, uid, nom, actif, credits,expiration="",debut="", fin=""):
+    def ajouter_ou_modifier_carte(self, uid, nom, actif, credits,expiration="",debut="", fin="",jours=""):
         toutes_les_lignes = self._lire_toutes_les_donnees() 
         
         carte_trouvee = False
@@ -137,6 +148,7 @@ class GestionCartesCSV:
                 ligne["Expiration"] = expiration
                 ligne["Debut"] = debut 
                 ligne["Fin"] = fin
+                ligne["Jours"] = jours
                 
                 if ligne.get("Id"):
                     id_final = ligne["Id"]
@@ -155,7 +167,8 @@ class GestionCartesCSV:
                 "Id": id_final,
                 "Expiration": expiration,
                 "Debut": debut, 
-                "Fin": fin
+                "Fin": fin,
+                "Jours": jours
                 
             }
             toutes_les_lignes.append(nouvelle_ligne)
@@ -237,6 +250,13 @@ class GestionCartesCSV:
         for ligne in lignes:
             actif_visuel = "Oui" if str(ligne.get("Actif")).lower() == "true" else "Non"
             
+            jours = ligne.get("Jours", "")
+            if not jours:
+                jours_visuel = "Tous"
+            else:
+                jours_visuel = jours
+
+
             table_data.append([
                 ligne.get("Id", "?"),
                 ligne.get("Nom", "Inconnu"),
@@ -244,10 +264,11 @@ class GestionCartesCSV:
                 actif_visuel,
                 ligne.get("Expiration", "-"),
                 f"{ligne.get('Debut','')} - {ligne.get('Fin','')}", 
+                jours_visuel,
                 ligne.get("UID", "")
             ])
 
-        headers = ["ID", "Nom", "Crédits", "Actif","Expiration","Horaires", "UID "]
+        headers = ["ID", "Nom", "Crédits", "Actif","Expiration","Horaires","Jours", "UID "]
         
         print("\n" + "="*50)
         print(" LISTE DES UTILISATEURS")
